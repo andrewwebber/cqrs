@@ -36,6 +36,17 @@ func NewAccount(firstName string, lastName string, emailAddress string) *Account
 	return account
 }
 
+func NewAccountFromHistory(id string, repository cqrs.EventSourcingRepository) (*Account, error) {
+	account := new(Account)
+	account.EventSourceBased = cqrs.NewEventSourceBasedWithID(account, id)
+
+	if error := repository.Get(id, account); error != nil {
+		return account, error
+	}
+
+	return account, nil
+}
+
 func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 	if len(newEmailAddress) < 1 {
 		return errors.New("Invalid newEmailAddress length")
@@ -49,36 +60,50 @@ func (account *Account) HandleAccountCreatedEvent(event *AccountCreatedEvent) {
 	account.EmailAddress = event.EmailAddress
 	account.FirstName = event.FirstName
 	account.LastName = event.LastName
-	log.Println("HandleAccountCreatedEvent")
+	log.Println("HandleAccountCreatedEvent ", event)
 }
 
 func (account *Account) HandleUsernameChangedEvent(event *EmailAddressChangedEvent) {
 	account.EmailAddress = event.NewEmailAddress
-	log.Println("HandleEmailAddressChangedEvent")
+	log.Println("HandleEmailAddressChangedEvent : ", event)
 }
 
 func TestEventSourcing(t *testing.T) {
-	cqrs.RegisterType(&AccountCreatedEvent{})
-	cqrs.RegisterType(&EmailAddressChangedEvent{})
-	cqrs.RegisterType(&Account{})
+	persistance, error := couchbase.NewEventStreamRepository()
+	if error != nil {
+		t.Fatal(error)
+	}
+
+	repository := cqrs.NewRepository(persistance)
+
+	repository.RegisterType(&AccountCreatedEvent{})
+	repository.RegisterType(&EmailAddressChangedEvent{})
+	repository.RegisterType(&Account{})
+
+	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example")
-	account.SetID("5058e029-d329-4c4b-b111-b042e48b0c5f")
+	account.SetID(accountID)
 	account.ChangeEmailAddress("john.snow@the.wall")
-	for _, event := range account.Events() {
-		log.Println("Event ", event)
+
+	log.Println(account.EmailAddress)
+	repository.Save(account)
+
+	account, error = NewAccountFromHistory(accountID, repository)
+	if error != nil {
+		t.Fatal(error)
 	}
 
 	log.Println(account.EmailAddress)
 
-	repository := couchbase.NewRepository()
+	account.ChangeEmailAddress("john.snow@golang.org")
+	log.Println(account.EmailAddress)
 	repository.Save(account)
 
-	var accountFromEvents Account
-	error := repository.Get("5058e029-d329-4c4b-b111-b042e48b0c5f", &accountFromEvents)
+	account, error = NewAccountFromHistory(accountID, repository)
 	if error != nil {
-		log.Println(error)
+		t.Fatal(error)
 	}
 
-	log.Println(accountFromEvents.EmailAddress)
+	log.Println(account.EmailAddress)
 }
