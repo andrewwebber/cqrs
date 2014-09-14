@@ -9,9 +9,7 @@ import (
 	"time"
 )
 
-var (
-	methodHandlerPrefix = "Handle"
-)
+var methodHandlerPrefix = "Handle"
 
 type EventsCache map[string]reflect.Type
 
@@ -145,17 +143,12 @@ func (s *EventSourceBased) Events() []interface{} {
 }
 
 type VersionedEvent struct {
-	ID        string
-	SourceID  string
-	Version   int
-	EventType string
-	Created   time.Time
+	ID        string    `json:"id"`
+	SourceID  string    `json:"sourceID"`
+	Version   int       `json:"version"`
+	EventType string    `json:"eventType"`
+	Created   time.Time `json:"time"`
 	Event     interface{}
-}
-
-type VersionedEventSource struct {
-	Type    string
-	Version int
 }
 
 type EventSourcingRepository interface {

@@ -3,7 +3,9 @@ package cqrs_test
 import (
 	"errors"
 	"github.com/andrewwebber/cqrs"
-	"github.com/andrewwebber/cqrs/couchbase"
+	// "github.com/andrewwebber/cqrs/couchbase"
+	"github.com/andrewwebber/cqrs/rethinkdb"
+	r "github.com/dancannon/gorethink"
 	"log"
 	"testing"
 )
@@ -69,10 +71,7 @@ func (account *Account) HandleUsernameChangedEvent(event *EmailAddressChangedEve
 }
 
 func TestEventSourcing(t *testing.T) {
-	persistance, error := couchbase.NewEventStreamRepository()
-	if error != nil {
-		t.Fatal(error)
-	}
+	persistance := CreatePersistanceProvider(t)
 
 	repository := cqrs.NewRepository(persistance)
 	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{})
@@ -85,7 +84,7 @@ func TestEventSourcing(t *testing.T) {
 	log.Println(account.EmailAddress)
 	repository.Save(account)
 
-	account, error = NewAccountFromHistory(accountID, repository)
+	account, error := NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
 	}
@@ -102,4 +101,19 @@ func TestEventSourcing(t *testing.T) {
 	}
 
 	log.Println(account.EmailAddress)
+}
+
+func CreatePersistanceProvider(t *testing.T) cqrs.EventStreamRepository {
+	connectOps := r.ConnectOpts{Address: "localhost:28015", Database: "cqrs"}
+	session, error := r.Connect(connectOps)
+	r.Table("events").Delete().Run(session)
+
+	persistance, error := rethinkdb.NewRepository(connectOps, "events")
+	if error != nil {
+		t.Fatal(error)
+	}
+
+	r.Table("events").Delete().Run(session)
+
+	return persistance
 }

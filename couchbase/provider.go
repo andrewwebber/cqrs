@@ -12,16 +12,16 @@ import (
 )
 
 type cbVersionedEvent struct {
-	ID        string
-	SourceID  string
-	Version   int
-	EventType string
-	Created   time.Time
+	ID        string    `json:"id"`
+	SourceID  string    `json:"sourceID"`
+	Version   int       `json:"version"`
+	EventType string    `json:"eventType"`
+	Created   time.Time `json:"time"`
 	Event     json.RawMessage
 }
 
 // Repository : a Couchbase Server event stream repository
-type Repository struct {
+type repository struct {
 	bucket *couchbase.Bucket
 }
 
@@ -45,11 +45,11 @@ func NewEventStreamRepository() (cqrs.EventStreamRepository, error) {
 		return nil, err
 	}
 
-	return Repository{bucket}, nil
+	return repository{bucket}, nil
 }
 
 // Save persists an event sourced object into the repository
-func (r Repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
+func (r repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
 	latestVersion := events[len(events)-1].Version
 	for _, versionedEvent := range events {
 		key := fmt.Sprintf("%s:%d", sourceID, versionedEvent.Version)
@@ -62,7 +62,7 @@ func (r Repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
 }
 
 // Get retrieves an event sourced object by ID
-func (r Repository) Get(id string, typeRegistry cqrs.TypeRegistry) ([]cqrs.VersionedEvent, error) {
+func (r repository) Get(id string, typeRegistry cqrs.TypeRegistry) ([]cqrs.VersionedEvent, error) {
 	var version int
 	if error := r.bucket.Get(id, &version); error != nil {
 		log.Println("Error getting event source ", id)
