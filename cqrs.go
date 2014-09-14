@@ -18,7 +18,7 @@ type EventsCache map[string]reflect.Type
 type TypeRegistry interface {
 	GetHandlers(interface{}) HandlersCache
 	GetEventType(string) (reflect.Type, bool)
-	RegisterType(typeInstance interface{})
+	RegisterAggregate(aggregate interface{}, events ...interface{})
 }
 
 type DefaultTypeRegistry struct {
@@ -192,7 +192,7 @@ func (r DefaultEventSourcingRepository) Save(source EventSourced) error {
 			EventType: eventType.String(),
 			Created:   time.Now(),
 			Event:     event}
-		log.Println(versionedEvent)
+
 		events = append(events, versionedEvent)
 	}
 
@@ -226,7 +226,15 @@ func (r DefaultEventSourcingRepository) Get(id string, source EventSourced) erro
 	return nil
 }
 
-func (r DefaultTypeRegistry) RegisterType(typeInstance interface{}) {
-	rawType := reflect.TypeOf(typeInstance)
+func (r DefaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
+	r.RegisterType(aggregate)
+
+	for _, event := range events {
+		r.RegisterType(event)
+	}
+}
+
+func (r DefaultTypeRegistry) RegisterType(source interface{}) {
+	rawType := reflect.TypeOf(source)
 	r.eventTypes[rawType.String()] = rawType
 }

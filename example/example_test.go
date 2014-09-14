@@ -75,11 +75,7 @@ func TestEventSourcing(t *testing.T) {
 	}
 
 	repository := cqrs.NewRepository(persistance)
-
-	repository.RegisterType(&AccountCreatedEvent{})
-	repository.RegisterType(&EmailAddressChangedEvent{})
-	repository.RegisterType(&Account{})
-
+	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example")
