@@ -26,7 +26,8 @@ type repository struct {
 	eventsTableName string
 }
 
-func NewRepository(options rethinkdb.ConnectOpts, eventsTableName string) (cqrs.EventStreamRepository, error) {
+// NewEventStreamRepository creates new Rethinkdb based event stream repository
+func NewEventStreamRepository(options rethinkdb.ConnectOpts, eventsTableName string) (cqrs.EventStreamRepository, error) {
 	session, err := rethinkdb.Connect(options)
 
 	if err != nil {
@@ -47,7 +48,7 @@ func (r repository) Save(id string, events []cqrs.VersionedEvent) error {
 			EventType: event.EventType,
 			Created:   event.Created,
 			Event:     event.Event}
-		log.Println("Writting ", rethinkVersionedEvent)
+
 		rethinkdb.Table(r.eventsTableName).Insert(rethinkVersionedEvent).Run(r.session)
 	}
 

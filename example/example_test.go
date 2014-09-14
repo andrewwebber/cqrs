@@ -3,7 +3,7 @@ package cqrs_test
 import (
 	"errors"
 	"github.com/andrewwebber/cqrs"
-	// "github.com/andrewwebber/cqrs/couchbase"
+	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rethinkdb"
 	r "github.com/dancannon/gorethink"
 	"log"
@@ -70,20 +70,48 @@ func (account *Account) HandleUsernameChangedEvent(event *EmailAddressChangedEve
 	log.Println("HandleEmailAddressChangedEvent : ", event)
 }
 
-func TestEventSourcing(t *testing.T) {
-	persistance := CreatePersistanceProvider(t)
+func TestEventSourcingWithRethinkdb(t *testing.T) {
+	connectOps := r.ConnectOpts{Address: "localhost:28015", Database: "cqrs"}
+	session, error := r.Connect(connectOps)
+	r.Table("events").Delete().Run(session)
 
+	persistance, error := rethinkdb.NewEventStreamRepository(connectOps, "events")
+	if error != nil {
+		t.Fatal(error)
+	}
+
+	r.Table("events").Delete().Run(session)
+
+	RunScenario(t, persistance)
+}
+
+func TestEventSourcingWithCouchbase(t *testing.T) {
+	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/")
+	if error != nil {
+		t.Fatal(error)
+	}
+
+	RunScenario(t, persistance)
+}
+
+func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	repository := cqrs.NewRepository(persistance)
 	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
+	// Create an account
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example")
 	account.SetID(accountID)
-	account.ChangeEmailAddress("john.snow@the.wall")
-
 	log.Println(account.EmailAddress)
+
+	// Change email address
+	account.ChangeEmailAddress("john.snow@the.wall")
+	log.Println(account.EmailAddress)
+
+	// Persist the account
 	repository.Save(account)
 
+	// Load the account from history
 	account, error := NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
@@ -91,29 +119,21 @@ func TestEventSourcing(t *testing.T) {
 
 	log.Println(account.EmailAddress)
 
-	account.ChangeEmailAddress("john.snow@golang.org")
+	// Change the email address and persist again
+	lastEmailAddress := "john.snow@golang.org"
+	account.ChangeEmailAddress(lastEmailAddress)
 	log.Println(account.EmailAddress)
 	repository.Save(account)
 
+	// Load from history
 	account, error = NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
 	}
 
+	// All events should have been replayed and the email address should be the latest
 	log.Println(account.EmailAddress)
-}
-
-func CreatePersistanceProvider(t *testing.T) cqrs.EventStreamRepository {
-	connectOps := r.ConnectOpts{Address: "localhost:28015", Database: "cqrs"}
-	session, error := r.Connect(connectOps)
-	r.Table("events").Delete().Run(session)
-
-	persistance, error := rethinkdb.NewRepository(connectOps, "events")
-	if error != nil {
-		t.Fatal(error)
+	if account.EmailAddress != lastEmailAddress {
+		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
-
-	r.Table("events").Delete().Run(session)
-
-	return persistance
 }

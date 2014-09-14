@@ -11,33 +11,32 @@ import (
 
 var methodHandlerPrefix = "Handle"
 
-type EventsCache map[string]reflect.Type
-
+// TypeRegistry providers a helper registry for mapping event types and handlers after performance json serializaton
 type TypeRegistry interface {
 	GetHandlers(interface{}) HandlersCache
 	GetEventType(string) (reflect.Type, bool)
 	RegisterAggregate(aggregate interface{}, events ...interface{})
 }
 
-type DefaultTypeRegistry struct {
+type defaultTypeRegistry struct {
 	handlersDirectory map[reflect.Type]HandlersCache
 	eventTypes        map[string]reflect.Type
 }
 
-func NewTypeRegistry() DefaultTypeRegistry {
+func newTypeRegistry() defaultTypeRegistry {
 	handlersDirectory := make(map[reflect.Type]HandlersCache, 0)
 	eventTypes := make(map[string]reflect.Type, 0)
 
-	return DefaultTypeRegistry{handlersDirectory, eventTypes}
+	return defaultTypeRegistry{handlersDirectory, eventTypes}
 }
 
-func (r DefaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
+func (r defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	sourceType := reflect.TypeOf(source)
 	var handlers HandlersCache
 	if value, ok := r.handlersDirectory[sourceType]; ok {
 		handlers = value
 	} else {
-		handlers = CreateHandlersCache(source)
+		handlers = createHandlersCache(source)
 
 		r.handlersDirectory[sourceType] = handlers
 	}
@@ -45,7 +44,7 @@ func (r DefaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	return handlers
 }
 
-func (r DefaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
+func (r defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
 	if eventTypeValue, ok := r.eventTypes[eventType]; ok {
 		return eventTypeValue, ok
 	}
@@ -53,7 +52,7 @@ func (r DefaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool)
 	return nil, false
 }
 
-func CreateHandlersCache(source interface{}) HandlersCache {
+func createHandlersCache(source interface{}) HandlersCache {
 	sourceType := reflect.TypeOf(source)
 	handlers := make(HandlersCache)
 
@@ -80,6 +79,7 @@ func CreateHandlersCache(source interface{}) HandlersCache {
 	return handlers
 }
 
+// EventSourced providers an interface for event sourced aggregate types
 type EventSourced interface {
 	ID() string
 	SetID(string)
@@ -89,8 +89,10 @@ type EventSourced interface {
 	CallEventHandler(versionedEvent interface{})
 }
 
+// HandlersCache is a map of types to functions that will be used to route event sourcing events
 type HandlersCache map[reflect.Type]func(source interface{}, event interface{})
 
+// EventSourceBased provider a base class for aggregate times wishing to contain basis helper functionality for event sourcing
 type EventSourceBased struct {
 	id            string
 	version       int
@@ -99,19 +101,23 @@ type EventSourceBased struct {
 	handlersCache HandlersCache
 }
 
+// NewEventSourceBased constructor
 func NewEventSourceBased(source interface{}) EventSourceBased {
 	return NewEventSourceBasedWithID(source, uuid.New())
 }
 
+// NewEventSourceBasedWithID constructor
 func NewEventSourceBasedWithID(source interface{}, id string) EventSourceBased {
-	return EventSourceBased{id, 0, []interface{}{}, source, CreateHandlersCache(source)}
+	return EventSourceBased{id, 0, []interface{}{}, source, createHandlersCache(source)}
 }
 
+// Update should be called to change the state of an aggregate type
 func (s *EventSourceBased) Update(versionedEvent interface{}) {
 	s.CallEventHandler(versionedEvent)
 	s.events = append(s.events, versionedEvent)
 }
 
+// CallEventHandler routes an event to an aggregate's event handler
 func (s *EventSourceBased) CallEventHandler(versionedEvent interface{}) {
 	eventType := reflect.TypeOf(versionedEvent)
 
@@ -122,26 +128,32 @@ func (s *EventSourceBased) CallEventHandler(versionedEvent interface{}) {
 	}
 }
 
+// ID provider the aggregate's ID
 func (s *EventSourceBased) ID() string {
 	return s.id
 }
 
+// SetID sets the aggregate's ID
 func (s *EventSourceBased) SetID(id string) {
 	s.id = id
 }
 
+// Version provider the aggregate's Version
 func (s *EventSourceBased) Version() int {
 	return s.version
 }
 
+// SetVersion sets the aggregate's Version
 func (s *EventSourceBased) SetVersion(version int) {
 	s.version = version
 }
 
+// Events returns a slice of newly created events since last deserialization
 func (s *EventSourceBased) Events() []interface{} {
 	return s.events
 }
 
+// VersionedEvent represents an event in the past for an aggregate
 type VersionedEvent struct {
 	ID        string    `json:"id"`
 	SourceID  string    `json:"sourceID"`
@@ -151,26 +163,30 @@ type VersionedEvent struct {
 	Event     interface{}
 }
 
+// EventSourcingRepository is a repository for event source based aggregates
 type EventSourcingRepository interface {
+	TypeRegistry
 	Save(EventSourced) error
 	Get(string, EventSourced) error
 }
 
+// EventStreamRepository is a persistance layer for events associated with aggregates by ID
 type EventStreamRepository interface {
 	Save(string, []VersionedEvent) error
 	Get(string, TypeRegistry) ([]VersionedEvent, error)
 }
 
-type DefaultEventSourcingRepository struct {
-	DefaultTypeRegistry
+type defaultEventSourcingRepository struct {
+	defaultTypeRegistry
 	EventRepository EventStreamRepository
 }
 
-func NewRepository(eventStreamRepository EventStreamRepository) DefaultEventSourcingRepository {
-	return DefaultEventSourcingRepository{NewTypeRegistry(), eventStreamRepository}
+// NewRepository is a constructor for the EventSourcingRepository
+func NewRepository(eventStreamRepository EventStreamRepository) EventSourcingRepository {
+	return defaultEventSourcingRepository{newTypeRegistry(), eventStreamRepository}
 }
 
-func (r DefaultEventSourcingRepository) Save(source EventSourced) error {
+func (r defaultEventSourcingRepository) Save(source EventSourced) error {
 	id := source.ID()
 	currentVersion := source.Version() + 1
 	latestVersion := 0
@@ -196,7 +212,7 @@ func (r DefaultEventSourcingRepository) Save(source EventSourced) error {
 	return nil
 }
 
-func (r DefaultEventSourcingRepository) Get(id string, source EventSourced) error {
+func (r defaultEventSourcingRepository) Get(id string, source EventSourced) error {
 	events, error := r.EventRepository.Get(id, r)
 	if error != nil {
 		return error
@@ -219,7 +235,7 @@ func (r DefaultEventSourcingRepository) Get(id string, source EventSourced) erro
 	return nil
 }
 
-func (r DefaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
+func (r defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
 	r.RegisterType(aggregate)
 
 	for _, event := range events {
@@ -227,7 +243,7 @@ func (r DefaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...
 	}
 }
 
-func (r DefaultTypeRegistry) RegisterType(source interface{}) {
+func (r defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
 	r.eventTypes[rawType.String()] = rawType
 }

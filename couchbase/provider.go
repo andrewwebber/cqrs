@@ -26,8 +26,8 @@ type repository struct {
 }
 
 // NewEventStreamRepository creates new Couchbase Server based event stream repository
-func NewEventStreamRepository() (cqrs.EventStreamRepository, error) {
-	c, err := couchbase.Connect("http://localhost:8091/")
+func NewEventStreamRepository(connectionString string) (cqrs.EventStreamRepository, error) {
+	c, err := couchbase.Connect(connectionString)
 	if err != nil {
 		log.Println(fmt.Sprintf("Error connecting to couchbase : %v", err))
 		return nil, err
