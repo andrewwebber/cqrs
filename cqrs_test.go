@@ -65,7 +65,7 @@ func (account *Account) HandleAccountCreatedEvent(event *AccountCreatedEvent) {
 	log.Println("HandleAccountCreatedEvent ", event)
 }
 
-func (account *Account) HandleUsernameChangedEvent(event *EmailAddressChangedEvent) {
+func (account *Account) HandleEmailAddressChangedEvent(event *EmailAddressChangedEvent) {
 	account.EmailAddress = event.NewEmailAddress
 	log.Println("HandleEmailAddressChangedEvent : ", event)
 }
