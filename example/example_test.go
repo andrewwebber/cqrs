@@ -1,4 +1,4 @@
-package cqrs_test
+package example_test
 
 import (
 	"errors"
@@ -140,41 +140,50 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 }
 
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
-	repository := cqrs.NewRepositoryWithPublisher(persistance, ConsoleEventPublisher{})
+	readModel := NewReadModelPublisher()
+	repository := cqrs.NewRepositoryWithPublisher(persistance, readModel)
 	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{}, &AccountCreditedEvent{}, &AccountDebitedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
-	// Create an account
+	log.Println("Create an account")
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example", 0.0)
 	account.SetID(accountID)
-	log.Println(account.EmailAddress)
+	log.Println(account)
+	log.Println(readModel)
 
-	// Change email address and credit the account
+	log.Println("Change email address and credit the account")
 	account.ChangeEmailAddress("john.snow@the.wall")
 	account.Credit(50)
 	account.Credit(50)
 	log.Println(account)
+	log.Println(readModel)
 
-	// Persist the account
+	log.Println("Persist the account")
 	repository.Save(account)
+	log.Println(readModel)
 
-	// Load the account from history
+	log.Println("Load the account from history")
 	account, error := NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
 	}
 
 	log.Println(account)
+	log.Println(readModel)
 
-	// Change the email address and persist again
+	log.Println("Change the email address, credit 150, debit 200")
 	lastEmailAddress := "john.snow@golang.org"
 	account.ChangeEmailAddress(lastEmailAddress)
 	account.Credit(150)
 	account.Debit(200)
 	log.Println(account)
-	repository.Save(account)
+	log.Println(readModel)
 
-	// Load from history
+	log.Println("Persist the account")
+	repository.Save(account)
+	log.Println(readModel)
+
+	log.Println("Load the account from history")
 	account, error = NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
@@ -182,18 +191,8 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 
 	// All events should have been replayed and the email address should be the latest
 	log.Println(account)
+	log.Println(readModel)
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
-}
-
-type ConsoleEventPublisher struct {
-}
-
-func (p ConsoleEventPublisher) PublishEvents(events []cqrs.VersionedEvent) error {
-	for _, event := range events {
-		log.Println("Publish event : ", event)
-	}
-
-	return nil
 }
