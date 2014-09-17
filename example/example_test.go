@@ -2,6 +2,7 @@ package cqrs_test
 
 import (
 	"errors"
+	"fmt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rethinkdb"
@@ -11,14 +12,23 @@ import (
 )
 
 type AccountCreatedEvent struct {
-	FirstName    string
-	LastName     string
-	EmailAddress string
+	FirstName      string
+	LastName       string
+	EmailAddress   string
+	InitialBalance float64
 }
 
 type EmailAddressChangedEvent struct {
 	PreviousEmailAddress string
 	NewEmailAddress      string
+}
+
+type AccountCreditedEvent struct {
+	Amount float64
+}
+
+type AccountDebitedEvent struct {
+	Amount float64
 }
 
 type Account struct {
@@ -27,13 +37,18 @@ type Account struct {
 	FirstName    string
 	LastName     string
 	EmailAddress string
+	Balance      float64
 }
 
-func NewAccount(firstName string, lastName string, emailAddress string) *Account {
+func (account *Account) String() string {
+	return fmt.Sprintf("Account %s with Email Address %s has balance %f", account.ID(), account.EmailAddress, account.Balance)
+}
+
+func NewAccount(firstName string, lastName string, emailAddress string, initialBalance float64) *Account {
 	account := new(Account)
 	account.EventSourceBased = cqrs.NewEventSourceBased(account)
 
-	event := AccountCreatedEvent{firstName, lastName, emailAddress}
+	event := AccountCreatedEvent{firstName, lastName, emailAddress, initialBalance}
 	account.Update(&event)
 	return account
 }
@@ -49,6 +64,12 @@ func NewAccountFromHistory(id string, repository cqrs.EventSourcingRepository) (
 	return account, nil
 }
 
+func (account *Account) HandleAccountCreatedEvent(event *AccountCreatedEvent) {
+	account.EmailAddress = event.EmailAddress
+	account.FirstName = event.FirstName
+	account.LastName = event.LastName
+}
+
 func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 	if len(newEmailAddress) < 1 {
 		return errors.New("Invalid newEmailAddress length")
@@ -58,16 +79,40 @@ func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 	return nil
 }
 
-func (account *Account) HandleAccountCreatedEvent(event *AccountCreatedEvent) {
-	account.EmailAddress = event.EmailAddress
-	account.FirstName = event.FirstName
-	account.LastName = event.LastName
-	log.Println("HandleAccountCreatedEvent ", event)
-}
-
 func (account *Account) HandleEmailAddressChangedEvent(event *EmailAddressChangedEvent) {
 	account.EmailAddress = event.NewEmailAddress
-	log.Println("HandleEmailAddressChangedEvent : ", event)
+}
+
+func (account *Account) Credit(amount float64) error {
+	if amount <= 0 {
+		return errors.New("Invalid amount - negative credits not supported")
+	}
+
+	account.Update(&AccountCreditedEvent{amount})
+
+	return nil
+}
+
+func (account *Account) HandleAccountCredited(event *AccountCreditedEvent) {
+	account.Balance += event.Amount
+}
+
+func (account *Account) Debit(amount float64) error {
+	if amount <= 0 {
+		return errors.New("Invalid amount - negative credits not supported")
+	}
+
+	if projection := account.Balance - amount; projection < 0 {
+		return errors.New("Negative balance not supported")
+	}
+
+	account.Update(&AccountDebitedEvent{amount})
+
+	return nil
+}
+
+func (account *Account) HandleAccountDebitedEvent(event *AccountDebitedEvent) {
+	account.Balance -= event.Amount
 }
 
 func TestEventSourcingWithRethinkdb(t *testing.T) {
@@ -95,18 +140,20 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 }
 
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
-	repository := cqrs.NewRepository(persistance)
-	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{})
+	repository := cqrs.NewRepositoryWithPublisher(persistance, ConsoleEventPublisher{})
+	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{}, &AccountCreditedEvent{}, &AccountDebitedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	// Create an account
-	account := NewAccount("John", "Snow", "john.snow@cqrs.example")
+	account := NewAccount("John", "Snow", "john.snow@cqrs.example", 0.0)
 	account.SetID(accountID)
 	log.Println(account.EmailAddress)
 
-	// Change email address
+	// Change email address and credit the account
 	account.ChangeEmailAddress("john.snow@the.wall")
-	log.Println(account.EmailAddress)
+	account.Credit(50)
+	account.Credit(50)
+	log.Println(account)
 
 	// Persist the account
 	repository.Save(account)
@@ -117,12 +164,14 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 		t.Fatal(error)
 	}
 
-	log.Println(account.EmailAddress)
+	log.Println(account)
 
 	// Change the email address and persist again
 	lastEmailAddress := "john.snow@golang.org"
 	account.ChangeEmailAddress(lastEmailAddress)
-	log.Println(account.EmailAddress)
+	account.Credit(150)
+	account.Debit(200)
+	log.Println(account)
 	repository.Save(account)
 
 	// Load from history
@@ -132,8 +181,19 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	}
 
 	// All events should have been replayed and the email address should be the latest
-	log.Println(account.EmailAddress)
+	log.Println(account)
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
+}
+
+type ConsoleEventPublisher struct {
+}
+
+func (p ConsoleEventPublisher) PublishEvents(events []cqrs.VersionedEvent) error {
+	for _, event := range events {
+		log.Println("Publish event : ", event)
+	}
+
+	return nil
 }
