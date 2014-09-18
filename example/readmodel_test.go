@@ -1,9 +1,12 @@
 package example_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/andrewwebber/cqrs"
+	"io/ioutil"
 	"log"
+	"os"
 )
 
 type AccountReadModel struct {
@@ -31,6 +34,21 @@ func (model *ReadModelPublisher) String() string {
 	return result
 }
 
+func (model *ReadModelPublisher) LoadAccounts(persistance cqrs.EventStreamRepository, repository cqrs.TypeRegistry) {
+	readBytes, error := ioutil.ReadFile("/tmp/accounts.json")
+
+	if !os.IsNotExist(error) {
+		fmt.Println("Loading accounts from disk")
+		json.Unmarshal(readBytes, &model.Accounts)
+	} else {
+		fmt.Println("Replaying events from repository")
+		events, error := persistance.Get("5058e029-d329-4c4b-b111-b042e48b0c5f", repository)
+		if error == nil {
+			model.PublishEvents(events)
+		}
+	}
+}
+
 func NewReadModelPublisher() *ReadModelPublisher {
 	return &ReadModelPublisher{make(map[string]*AccountReadModel)}
 }
@@ -45,6 +63,7 @@ func NewReadModelPublisherFromHistory(events []cqrs.VersionedEvent) (*ReadModelP
 }
 
 func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) error {
+
 	for _, event := range events {
 		log.Println("ViewModel received event : ", event)
 		switch event.Event.(type) {
@@ -58,6 +77,16 @@ func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) err
 		case *EmailAddressChangedEvent:
 			model.UpdateViewModelOnEmailAddressChangedEvent(event.SourceID, event.Event.(*EmailAddressChangedEvent))
 		}
+	}
+
+	bytes, error := json.Marshal(model.Accounts)
+	if error != nil {
+		return error
+	}
+
+	error = ioutil.WriteFile("/tmp/accounts.json", bytes, 0644)
+	if error != nil {
+		return error
 	}
 
 	return nil

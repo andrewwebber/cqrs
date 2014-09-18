@@ -141,13 +141,27 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	readModel := NewReadModelPublisher()
+
 	repository := cqrs.NewRepositoryWithPublisher(persistance, readModel)
 	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{}, &AccountCreditedEvent{}, &AccountDebitedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
-	log.Println("Create an account")
-	account := NewAccount("John", "Snow", "john.snow@cqrs.example", 0.0)
-	account.SetID(accountID)
+	readModel.LoadAccounts(persistance, repository)
+
+	log.Println("Loaded accounts")
+	log.Println(readModel)
+
+	log.Println("Create or find an account")
+	readModelAccount := readModel.Accounts[accountID]
+
+	var account *Account
+	if readModelAccount == nil {
+		account = NewAccount("John", "Snow", "john.snow@cqrs.example", 0.0)
+		account.SetID(accountID)
+	} else {
+		account, _ = NewAccountFromHistory(accountID, repository)
+	}
+
 	log.Println(account)
 	log.Println(readModel)
 
