@@ -18,8 +18,8 @@ type TypeRegistry interface {
 }
 
 type defaultTypeRegistry struct {
-	handlersDirectory map[reflect.Type]HandlersCache
-	eventTypes        map[string]reflect.Type
+	HandlersDirectory map[reflect.Type]HandlersCache
+	EventTypes        map[string]reflect.Type
 }
 
 func newTypeRegistry() defaultTypeRegistry {
@@ -32,19 +32,19 @@ func newTypeRegistry() defaultTypeRegistry {
 func (r defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	sourceType := reflect.TypeOf(source)
 	var handlers HandlersCache
-	if value, ok := r.handlersDirectory[sourceType]; ok {
+	if value, ok := r.HandlersDirectory[sourceType]; ok {
 		handlers = value
 	} else {
 		handlers = createHandlersCache(source)
 
-		r.handlersDirectory[sourceType] = handlers
+		r.HandlersDirectory[sourceType] = handlers
 	}
 
 	return handlers
 }
 
 func (r defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
-	if eventTypeValue, ok := r.eventTypes[eventType]; ok {
+	if eventTypeValue, ok := r.EventTypes[eventType]; ok {
 		return eventTypeValue, ok
 	}
 
@@ -53,7 +53,7 @@ func (r defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool)
 
 func (r defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
-	r.eventTypes[rawType.String()] = rawType
+	r.EventTypes[rawType.String()] = rawType
 }
 
 func (r defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
@@ -73,7 +73,7 @@ func createHandlersCache(source interface{}) HandlersCache {
 		method := sourceType.Method(i)
 
 		if strings.HasPrefix(method.Name, methodHandlerPrefix) {
-			//   func (source *MySource) HandleMyEvent(e *MyEvent).
+			//   func (source *MySource) HandleMyEvent(e MyEvent).
 			if method.Type.NumIn() == 2 {
 				eventType := method.Type.In(1)
 				handler := func(source interface{}, event interface{}) {
