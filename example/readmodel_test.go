@@ -68,14 +68,14 @@ func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) err
 		log.Println("ViewModel received event : ", event)
 		switch event.Event.(type) {
 		default:
-		case *AccountCreatedEvent:
-			model.UpdateViewModelOnAccountCreatedEvent(event.SourceID, event.Event.(*AccountCreatedEvent))
-		case *AccountCreditedEvent:
-			model.UpdateViewModelOnAccountCreditedEvent(event.SourceID, event.Event.(*AccountCreditedEvent))
-		case *AccountDebitedEvent:
-			model.UpdateViewModelOnAccountDebitedEvent(event.SourceID, event.Event.(*AccountDebitedEvent))
-		case *EmailAddressChangedEvent:
-			model.UpdateViewModelOnEmailAddressChangedEvent(event.SourceID, event.Event.(*EmailAddressChangedEvent))
+		case AccountCreatedEvent:
+			model.UpdateViewModelOnAccountCreatedEvent(event.SourceID, event.Event.(AccountCreatedEvent))
+		case AccountCreditedEvent:
+			model.UpdateViewModelOnAccountCreditedEvent(event.SourceID, event.Event.(AccountCreditedEvent))
+		case AccountDebitedEvent:
+			model.UpdateViewModelOnAccountDebitedEvent(event.SourceID, event.Event.(AccountDebitedEvent))
+		case EmailAddressChangedEvent:
+			model.UpdateViewModelOnEmailAddressChangedEvent(event.SourceID, event.Event.(EmailAddressChangedEvent))
 		}
 	}
 
@@ -92,18 +92,18 @@ func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) err
 	return nil
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountCreatedEvent(accountID string, event *AccountCreatedEvent) {
+func (model *ReadModelPublisher) UpdateViewModelOnAccountCreatedEvent(accountID string, event AccountCreatedEvent) {
 	model.Accounts[accountID] = &AccountReadModel{accountID, event.FirstName, event.LastName, event.EmailAddress, event.InitialBalance}
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountCreditedEvent(accountID string, event *AccountCreditedEvent) {
+func (model *ReadModelPublisher) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
 	model.Accounts[accountID].Balance += event.Amount
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountDebitedEvent(accountID string, event *AccountDebitedEvent) {
+func (model *ReadModelPublisher) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
 	model.Accounts[accountID].Balance -= event.Amount
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event *EmailAddressChangedEvent) {
+func (model *ReadModelPublisher) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
 	model.Accounts[accountID].EmailAddress = event.NewEmailAddress
 }

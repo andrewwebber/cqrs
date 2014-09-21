@@ -49,7 +49,7 @@ func NewAccount(firstName string, lastName string, emailAddress string, initialB
 	account.EventSourceBased = cqrs.NewEventSourceBased(account)
 
 	event := AccountCreatedEvent{firstName, lastName, emailAddress, initialBalance}
-	account.Update(&event)
+	account.Update(event)
 	return account
 }
 
@@ -64,7 +64,7 @@ func NewAccountFromHistory(id string, repository cqrs.EventSourcingRepository) (
 	return account, nil
 }
 
-func (account *Account) HandleAccountCreatedEvent(event *AccountCreatedEvent) {
+func (account *Account) HandleAccountCreatedEvent(event AccountCreatedEvent) {
 	account.EmailAddress = event.EmailAddress
 	account.FirstName = event.FirstName
 	account.LastName = event.LastName
@@ -75,11 +75,11 @@ func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 		return errors.New("Invalid newEmailAddress length")
 	}
 
-	account.Update(&EmailAddressChangedEvent{account.EmailAddress, newEmailAddress})
+	account.Update(EmailAddressChangedEvent{account.EmailAddress, newEmailAddress})
 	return nil
 }
 
-func (account *Account) HandleEmailAddressChangedEvent(event *EmailAddressChangedEvent) {
+func (account *Account) HandleEmailAddressChangedEvent(event EmailAddressChangedEvent) {
 	account.EmailAddress = event.NewEmailAddress
 }
 
@@ -88,12 +88,12 @@ func (account *Account) Credit(amount float64) error {
 		return errors.New("Invalid amount - negative credits not supported")
 	}
 
-	account.Update(&AccountCreditedEvent{amount})
+	account.Update(AccountCreditedEvent{amount})
 
 	return nil
 }
 
-func (account *Account) HandleAccountCredited(event *AccountCreditedEvent) {
+func (account *Account) HandleAccountCredited(event AccountCreditedEvent) {
 	account.Balance += event.Amount
 }
 
@@ -106,12 +106,12 @@ func (account *Account) Debit(amount float64) error {
 		return errors.New("Negative balance not supported")
 	}
 
-	account.Update(&AccountDebitedEvent{amount})
+	account.Update(AccountDebitedEvent{amount})
 
 	return nil
 }
 
-func (account *Account) HandleAccountDebitedEvent(event *AccountDebitedEvent) {
+func (account *Account) HandleAccountDebitedEvent(event AccountDebitedEvent) {
 	account.Balance -= event.Amount
 }
 
@@ -143,7 +143,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	readModel := NewReadModelPublisher()
 
 	repository := cqrs.NewRepositoryWithPublisher(persistance, readModel)
-	repository.RegisterAggregate(&Account{}, &AccountCreatedEvent{}, &EmailAddressChangedEvent{}, &AccountCreditedEvent{}, &AccountDebitedEvent{})
+	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	readModel.LoadAccounts(persistance, repository)
