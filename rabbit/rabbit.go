@@ -2,12 +2,23 @@ package rabbit
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/streadway/amqp"
 	"log"
+	"reflect"
 	"time"
 )
+
+type RawVersionedEvent struct {
+	ID        string    `json:"id"`
+	SourceID  string    `json:"sourceID"`
+	Version   int       `json:"version"`
+	EventType string    `json:"eventType"`
+	Created   time.Time `json:"time"`
+	Event     json.RawMessage
+}
 
 type EventBus struct {
 	connectionString string
@@ -73,8 +84,10 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 }
 
 func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) error {
-
 	conn, c, events, err := bus.consumeEventsQueue()
+	if err != nil {
+		return err
+	}
 
 	go func() {
 		select {
@@ -84,17 +97,37 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 				ch <- err
 			}
 
-		case event, more := <-events:
-			log.Println("Received event: ", event)
+		case message, more := <-events:
+			log.Println("Received event: ", message)
 			if more {
-				var versionedEvent cqrs.VersionedEvent
-				if err := json.Unmarshal(event.Body, &versionedEvent); err != nil {
+				var raw RawVersionedEvent
+				if err := json.Unmarshal(message.Body, &raw); err != nil {
 					options.Error <- fmt.Errorf("json.Unmarshal received event: %v", err)
 				} else {
-					ackCh := make(chan bool)
-					options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
-					result := <-ackCh
-					event.Ack(result)
+					eventType, ok := options.EventTypeCache[raw.EventType]
+					if !ok {
+						log.Println("Cannot find event type", raw.EventType)
+						options.Error <- errors.New("Cannot find event type " + raw.EventType)
+					} else {
+
+						eventValue := reflect.New(eventType)
+						event := eventValue.Interface()
+						if err := json.Unmarshal(raw.Event, event); err != nil {
+							options.Error <- errors.New("Error deserializing event " + raw.EventType)
+						} else {
+							versionedEvent := cqrs.VersionedEvent{
+								ID:        raw.ID,
+								SourceID:  raw.SourceID,
+								Version:   raw.Version,
+								EventType: raw.EventType,
+								Created:   raw.Created,
+								Event:     reflect.Indirect(eventValue).Interface()}
+							ackCh := make(chan bool)
+							options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
+							result := <-ackCh
+							message.Ack(result)
+						}
+					}
 				}
 			} else {
 				// Could have been disconnected

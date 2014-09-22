@@ -31,9 +31,10 @@ type VersionedEventTransactedAccept struct {
 }
 
 type VersionedEventReceiverOptions struct {
-	Close        chan chan error
-	Error        chan error
-	ReceiveEvent chan VersionedEventTransactedAccept
+	EventTypeCache EventTypeCache
+	Close          chan chan error
+	Error          chan error
+	ReceiveEvent   chan VersionedEventTransactedAccept
 }
 
 type VersionedEventDispatcher interface {

@@ -10,6 +10,9 @@ var methodHandlerPrefix = "Handle"
 // HandlersCache is a map of types to functions that will be used to route event sourcing events
 type HandlersCache map[reflect.Type]func(source interface{}, event interface{})
 
+// EventTypeCache is a map of strings to reflect.Type structures
+type EventTypeCache map[string]reflect.Type
+
 // TypeRegistry providers a helper registry for mapping event types and handlers after performance json serializaton
 type TypeRegistry interface {
 	GetHandlers(interface{}) HandlersCache
@@ -19,12 +22,12 @@ type TypeRegistry interface {
 
 type defaultTypeRegistry struct {
 	HandlersDirectory map[reflect.Type]HandlersCache
-	EventTypes        map[string]reflect.Type
+	EventTypes        EventTypeCache
 }
 
 func newTypeRegistry() defaultTypeRegistry {
 	handlersDirectory := make(map[reflect.Type]HandlersCache, 0)
-	eventTypes := make(map[string]reflect.Type, 0)
+	eventTypes := make(EventTypeCache, 0)
 
 	return defaultTypeRegistry{handlersDirectory, eventTypes}
 }
