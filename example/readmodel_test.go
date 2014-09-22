@@ -21,11 +21,11 @@ func (account *AccountReadModel) String() string {
 	return fmt.Sprintf("ReadModel::Account %s with Email Address %s has balance %f", account.ID, account.EmailAddress, account.Balance)
 }
 
-type ReadModelPublisher struct {
+type ReadModelAccounts struct {
 	Accounts map[string]*AccountReadModel
 }
 
-func (model *ReadModelPublisher) String() string {
+func (model *ReadModelAccounts) String() string {
 	result := "ReadModel::"
 	for key := range model.Accounts {
 		result += model.Accounts[key].String() + "\n"
@@ -34,36 +34,35 @@ func (model *ReadModelPublisher) String() string {
 	return result
 }
 
-func (model *ReadModelPublisher) LoadAccounts(persistance cqrs.EventStreamRepository, repository cqrs.TypeRegistry) {
+func (model *ReadModelAccounts) LoadAccounts(persistance cqrs.EventStreamRepository, repository cqrs.TypeRegistry) {
 	readBytes, error := ioutil.ReadFile("/tmp/accounts.json")
 
 	if !os.IsNotExist(error) {
-		fmt.Println("Loading accounts from disk")
+		log.Println("Loading accounts from disk")
 		json.Unmarshal(readBytes, &model.Accounts)
 	} else {
-		fmt.Println("Replaying events from repository")
+		log.Println("Replaying events from repository")
 		events, error := persistance.Get("5058e029-d329-4c4b-b111-b042e48b0c5f", repository)
 		if error == nil {
-			model.PublishEvents(events)
+			model.UpdateViewModel(events)
 		}
 	}
 }
 
-func NewReadModelPublisher() *ReadModelPublisher {
-	return &ReadModelPublisher{make(map[string]*AccountReadModel)}
+func NewReadModelAccounts() *ReadModelAccounts {
+	return &ReadModelAccounts{make(map[string]*AccountReadModel)}
 }
 
-func NewReadModelPublisherFromHistory(events []cqrs.VersionedEvent) (*ReadModelPublisher, error) {
-	publisher := NewReadModelPublisher()
-	if error := publisher.PublishEvents(events); error != nil {
+func NewReadModelAccountsFromHistory(events []cqrs.VersionedEvent) (*ReadModelAccounts, error) {
+	publisher := NewReadModelAccounts()
+	if error := publisher.UpdateViewModel(events); error != nil {
 		return nil, error
 	}
 
 	return publisher, nil
 }
 
-func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) error {
-
+func (model *ReadModelAccounts) UpdateViewModel(events []cqrs.VersionedEvent) error {
 	for _, event := range events {
 		log.Println("ViewModel received event : ", event)
 		switch event.Event.(type) {
@@ -92,18 +91,18 @@ func (model *ReadModelPublisher) PublishEvents(events []cqrs.VersionedEvent) err
 	return nil
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountCreatedEvent(accountID string, event AccountCreatedEvent) {
+func (model *ReadModelAccounts) UpdateViewModelOnAccountCreatedEvent(accountID string, event AccountCreatedEvent) {
 	model.Accounts[accountID] = &AccountReadModel{accountID, event.FirstName, event.LastName, event.EmailAddress, event.InitialBalance}
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
+func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
 	model.Accounts[accountID].Balance += event.Amount
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
+func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
 	model.Accounts[accountID].Balance -= event.Amount
 }
 
-func (model *ReadModelPublisher) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
+func (model *ReadModelAccounts) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
 	model.Accounts[accountID].EmailAddress = event.NewEmailAddress
 }

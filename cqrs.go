@@ -22,7 +22,7 @@ type EventStreamRepository interface {
 }
 
 type defaultEventSourcingRepository struct {
-	defaultTypeRegistry
+	*defaultTypeRegistry
 	EventRepository EventStreamRepository
 	Publisher       VersionedEventPublisher
 }

@@ -90,49 +90,50 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 	}
 
 	go func() {
-		select {
-		case ch := <-options.Close:
-			defer conn.Close()
-			if err = c.Cancel(bus.name, false); err != nil {
-				ch <- err
-			}
+		for {
+			select {
+			case ch := <-options.Close:
+				defer conn.Close()
+				if err = c.Cancel(bus.name, false); err != nil {
+					ch <- err
+				}
 
-		case message, more := <-events:
-			log.Println("Received event: ", message)
-			if more {
-				var raw RawVersionedEvent
-				if err := json.Unmarshal(message.Body, &raw); err != nil {
-					options.Error <- fmt.Errorf("json.Unmarshal received event: %v", err)
-				} else {
-					eventType, ok := options.EventTypeCache[raw.EventType]
-					if !ok {
-						log.Println("Cannot find event type", raw.EventType)
-						options.Error <- errors.New("Cannot find event type " + raw.EventType)
+			case message, more := <-events:
+				if more {
+					var raw RawVersionedEvent
+					if err := json.Unmarshal(message.Body, &raw); err != nil {
+						options.Error <- fmt.Errorf("json.Unmarshal received event: %v", err)
 					} else {
-
-						eventValue := reflect.New(eventType)
-						event := eventValue.Interface()
-						if err := json.Unmarshal(raw.Event, event); err != nil {
-							options.Error <- errors.New("Error deserializing event " + raw.EventType)
+						eventType, ok := options.TypeRegistry.GetEventType(raw.EventType)
+						if !ok {
+							log.Println("EventBus.Cannot find event type", raw.EventType)
+							options.Error <- errors.New("Cannot find event type " + raw.EventType)
 						} else {
-							versionedEvent := cqrs.VersionedEvent{
-								ID:        raw.ID,
-								SourceID:  raw.SourceID,
-								Version:   raw.Version,
-								EventType: raw.EventType,
-								Created:   raw.Created,
-								Event:     reflect.Indirect(eventValue).Interface()}
-							ackCh := make(chan bool)
-							options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
-							result := <-ackCh
-							message.Ack(result)
+							eventValue := reflect.New(eventType)
+							event := eventValue.Interface()
+							if err := json.Unmarshal(raw.Event, event); err != nil {
+								options.Error <- errors.New("Error deserializing event " + raw.EventType)
+							} else {
+								versionedEvent := cqrs.VersionedEvent{
+									ID:        raw.ID,
+									SourceID:  raw.SourceID,
+									Version:   raw.Version,
+									EventType: raw.EventType,
+									Created:   raw.Created,
+									Event:     reflect.Indirect(eventValue).Interface()}
+								ackCh := make(chan bool)
+								log.Println("EventBus.Dispatching Message")
+								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
+								result := <-ackCh
+								message.Ack(result)
+							}
 						}
 					}
+				} else {
+					// Could have been disconnected
+					log.Println("Stopped listening for messages")
+					conn, c, events, err = bus.consumeEventsQueue()
 				}
-			} else {
-				// Could have been disconnected
-				log.Println("Stopped listening for messages")
-				conn, c, events, err = bus.consumeEventsQueue()
 			}
 		}
 	}()

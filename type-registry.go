@@ -18,6 +18,7 @@ type TypeRegistry interface {
 	GetHandlers(interface{}) HandlersCache
 	GetEventType(string) (reflect.Type, bool)
 	RegisterAggregate(aggregate interface{}, events ...interface{})
+	RegisterEvents(events ...interface{})
 }
 
 type defaultTypeRegistry struct {
@@ -25,14 +26,20 @@ type defaultTypeRegistry struct {
 	EventTypes        EventTypeCache
 }
 
-func newTypeRegistry() defaultTypeRegistry {
-	handlersDirectory := make(map[reflect.Type]HandlersCache, 0)
-	eventTypes := make(EventTypeCache, 0)
+var cachedRegistry *defaultTypeRegistry
 
-	return defaultTypeRegistry{handlersDirectory, eventTypes}
+func newTypeRegistry() *defaultTypeRegistry {
+	if cachedRegistry == nil {
+		handlersDirectory := make(map[reflect.Type]HandlersCache, 0)
+		eventTypes := make(EventTypeCache, 0)
+
+		cachedRegistry = &defaultTypeRegistry{handlersDirectory, eventTypes}
+	}
+
+	return cachedRegistry
 }
 
-func (r defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
+func (r *defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	sourceType := reflect.TypeOf(source)
 	var handlers HandlersCache
 	if value, ok := r.HandlersDirectory[sourceType]; ok {
@@ -46,7 +53,7 @@ func (r defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	return handlers
 }
 
-func (r defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
+func (r *defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
 	if eventTypeValue, ok := r.EventTypes[eventType]; ok {
 		return eventTypeValue, ok
 	}
@@ -54,14 +61,18 @@ func (r defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool)
 	return nil, false
 }
 
-func (r defaultTypeRegistry) RegisterType(source interface{}) {
+func (r *defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
 	r.EventTypes[rawType.String()] = rawType
 }
 
-func (r defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
+func (r *defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
 	r.RegisterType(aggregate)
 
+	r.RegisterEvents(events)
+}
+
+func (r *defaultTypeRegistry) RegisterEvents(events ...interface{}) {
 	for _, event := range events {
 		r.RegisterType(event)
 	}

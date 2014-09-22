@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
+	"github.com/andrewwebber/cqrs/rabbit"
 	"github.com/andrewwebber/cqrs/rethinkdb"
 	r "github.com/dancannon/gorethink"
 	"log"
@@ -140,11 +141,36 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 }
 
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
-	readModel := NewReadModelPublisher()
-
-	repository := cqrs.NewRepositoryWithPublisher(persistance, readModel)
+	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "example_test", "testing.example")
+	repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
 	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
+
+	readModel := NewReadModelAccounts()
+
+	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
+	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
+		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		return nil
+	})
+
+	eventDispatcher.RegisterEventHandler(AccountCreditedEvent{}, func(event cqrs.VersionedEvent) error {
+		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		return nil
+	})
+
+	eventDispatcher.RegisterEventHandler(AccountDebitedEvent{}, func(event cqrs.VersionedEvent) error {
+		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		return nil
+	})
+
+	eventDispatcher.RegisterEventHandler(EmailAddressChangedEvent{}, func(event cqrs.VersionedEvent) error {
+		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		return nil
+	})
+
+	stopChannel := make(chan bool)
+	go eventDispatcher.Listen(stopChannel)
 
 	readModel.LoadAccounts(persistance, repository)
 
@@ -209,4 +235,6 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
+
+	stopChannel <- true
 }
