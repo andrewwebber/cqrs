@@ -28,8 +28,8 @@ type VersionedEventReceiver interface {
 
 // VersionedEventDispatchManager is responsible for coordinating receiving messages from event receivers and dispatching them to the event dispatcher.
 type VersionedEventDispatchManager struct {
-	VersionedEventDispatcher *MapBasedVersionedEventDispatcher
-	TypeRegistry             *defaultTypeRegistry
+	versionedEventDispatcher *MapBasedVersionedEventDispatcher
+	typeRegistry             *defaultTypeRegistry
 	receiver                 VersionedEventReceiver
 }
 
@@ -101,8 +101,8 @@ func NewVersionedEventDispatchManager(receiver VersionedEventReceiver) *Versione
 
 // RegisterEventHandler allows a caller to register an event handler given an event of the specified type being received
 func (m *VersionedEventDispatchManager) RegisterEventHandler(event interface{}, handler VersionedEventHandler) {
-	m.TypeRegistry.RegisterType(event)
-	m.VersionedEventDispatcher.RegisterEventHandler(event, handler)
+	m.typeRegistry.RegisterType(event)
+	m.versionedEventDispatcher.RegisterEventHandler(event, handler)
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests
@@ -117,7 +117,7 @@ func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
 	receiveEventChannel := make(chan VersionedEventTransactedAccept)
 
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	options := VersionedEventReceiverOptions{m.TypeRegistry, closeChannel, errorChannel, receiveEventChannel}
+	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveEventChannel}
 	if err := m.receiver.ReceiveEvents(options); err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
 		// This should eventually call an event handler. See cqrs.NewVersionedEventDispatcher()
 		case event := <-receiveEventChannel:
 			log.Println("EventDispatchManager.DispatchEvent: ", event.Event)
-			if err := m.VersionedEventDispatcher.DispatchEvent(event.Event); err != nil {
+			if err := m.versionedEventDispatcher.DispatchEvent(event.Event); err != nil {
 				log.Println("Error dispatching event: ", err)
 			}
 

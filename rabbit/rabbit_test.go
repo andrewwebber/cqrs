@@ -18,9 +18,10 @@ func TestEventBus(t *testing.T) {
 	// Create a new event bus
 	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "rabbit_test", "testing.events")
 
+	// Register types
 	eventType := reflect.TypeOf(SampleEvent{})
-	eventTypeCache := make(cqrs.EventTypeCache, 0)
-	eventTypeCache[eventType.Name()] = eventType
+	eventTypeCache := cqrs.NewTypeRegistry()
+	eventTypeCache.RegisterType(SampleEvent{})
 
 	// Create communication channels
 	//
@@ -39,7 +40,7 @@ func TestEventBus(t *testing.T) {
 	log.Println("Publishing events")
 	go func() {
 		if err := bus.PublishEvents([]cqrs.VersionedEvent{cqrs.VersionedEvent{
-			EventType: eventType.Name(),
+			EventType: eventType.String(),
 			Event:     SampleEvent{"rabbit_TestEventBus"}}}); err != nil {
 			t.Fatal(err)
 		}

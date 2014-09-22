@@ -19,6 +19,7 @@ type TypeRegistry interface {
 	GetEventType(string) (reflect.Type, bool)
 	RegisterAggregate(aggregate interface{}, events ...interface{})
 	RegisterEvents(events ...interface{})
+	RegisterType(interface{})
 }
 
 type defaultTypeRegistry struct {
@@ -27,6 +28,11 @@ type defaultTypeRegistry struct {
 }
 
 var cachedRegistry *defaultTypeRegistry
+
+// NewTypeRegistry constructs a new TypeRegistry
+func NewTypeRegistry() TypeRegistry {
+	return newTypeRegistry()
+}
 
 func newTypeRegistry() *defaultTypeRegistry {
 	if cachedRegistry == nil {
