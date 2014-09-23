@@ -39,7 +39,7 @@ type AccountDebitedEvent struct {
 }
 
 type Account struct {
-	cqrs.EventSourceBased
+	cqrs.EventSource
 
 	FirstName    string
 	LastName     string
@@ -54,7 +54,7 @@ func (account *Account) String() string {
 
 func NewAccount(firstName string, lastName string, emailAddress string, passwordHash []byte, initialBalance float64) *Account {
 	account := new(Account)
-	account.EventSourceBased = cqrs.NewEventSourceBased(account)
+	account.EventSource = cqrs.NewEventSource(account)
 
 	event := AccountCreatedEvent{firstName, lastName, emailAddress, passwordHash, initialBalance}
 	account.Update(event)
@@ -63,7 +63,7 @@ func NewAccount(firstName string, lastName string, emailAddress string, password
 
 func NewAccountFromHistory(id string, repository cqrs.EventSourcingRepository) (*Account, error) {
 	account := new(Account)
-	account.EventSourceBased = cqrs.NewEventSourceBasedWithID(account, id)
+	account.EventSource = cqrs.NewEventSourceWithID(account, id)
 
 	if error := repository.Get(id, account); error != nil {
 		return account, error

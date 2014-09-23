@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type RawVersionedEvent struct {
+type rawVersionedEvent struct {
 	ID        string    `json:"id"`
 	SourceID  string    `json:"sourceID"`
 	Version   int       `json:"version"`
@@ -100,7 +100,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 
 			case message, more := <-events:
 				if more {
-					var raw RawVersionedEvent
+					var raw rawVersionedEvent
 					if err := json.Unmarshal(message.Body, &raw); err != nil {
 						options.Error <- fmt.Errorf("json.Unmarshal received event: %v", err)
 					} else {
@@ -123,7 +123,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 									Event:     reflect.Indirect(eventValue).Interface()}
 								ackCh := make(chan bool)
 								log.Println("EventBus.Dispatching Message")
-								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
+								options.ReceiveEvent <- cqrs.VersionedEventReceived{versionedEvent, ackCh}
 								result := <-ackCh
 								message.Ack(result)
 							}

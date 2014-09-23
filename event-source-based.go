@@ -15,8 +15,8 @@ type EventSourced interface {
 	CallEventHandler(event interface{})
 }
 
-// EventSourceBased provider a base class for aggregate times wishing to contain basis helper functionality for event sourcing
-type EventSourceBased struct {
+// EventSource provides a base class for aggregates wishing to contain basic helper functionality for event sourcing
+type EventSource struct {
 	id            string
 	version       int
 	events        []interface{}
@@ -24,24 +24,24 @@ type EventSourceBased struct {
 	handlersCache HandlersCache
 }
 
-// NewEventSourceBased constructor
-func NewEventSourceBased(source interface{}) EventSourceBased {
-	return NewEventSourceBasedWithID(source, uuid.New())
+// NewEventSource constructor
+func NewEventSource(source interface{}) EventSource {
+	return NewEventSourceWithID(source, uuid.New())
 }
 
-// NewEventSourceBasedWithID constructor
-func NewEventSourceBasedWithID(source interface{}, id string) EventSourceBased {
-	return EventSourceBased{id, 0, []interface{}{}, source, createHandlersCache(source)}
+// NewEventSourceWithID constructor
+func NewEventSourceWithID(source interface{}, id string) EventSource {
+	return EventSource{id, 0, []interface{}{}, source, createHandlersCache(source)}
 }
 
 // Update should be called to change the state of an aggregate type
-func (s *EventSourceBased) Update(versionedEvent interface{}) {
+func (s *EventSource) Update(versionedEvent interface{}) {
 	s.CallEventHandler(versionedEvent)
 	s.events = append(s.events, versionedEvent)
 }
 
 // CallEventHandler routes an event to an aggregate's event handler
-func (s *EventSourceBased) CallEventHandler(event interface{}) {
+func (s *EventSource) CallEventHandler(event interface{}) {
 	eventType := reflect.TypeOf(event)
 
 	if handler, ok := s.handlersCache[eventType]; ok {
@@ -52,26 +52,26 @@ func (s *EventSourceBased) CallEventHandler(event interface{}) {
 }
 
 // ID provider the aggregate's ID
-func (s *EventSourceBased) ID() string {
+func (s *EventSource) ID() string {
 	return s.id
 }
 
 // SetID sets the aggregate's ID
-func (s *EventSourceBased) SetID(id string) {
+func (s *EventSource) SetID(id string) {
 	s.id = id
 }
 
 // Version provider the aggregate's Version
-func (s *EventSourceBased) Version() int {
+func (s *EventSource) Version() int {
 	return s.version
 }
 
 // SetVersion sets the aggregate's Version
-func (s *EventSourceBased) SetVersion(version int) {
+func (s *EventSource) SetVersion(version int) {
 	s.version = version
 }
 
 // Events returns a slice of newly created events since last deserialization
-func (s *EventSourceBased) Events() []interface{} {
+func (s *EventSource) Events() []interface{} {
 	return s.events
 }

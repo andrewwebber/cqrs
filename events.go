@@ -26,6 +26,12 @@ type VersionedEventReceiver interface {
 	ReceiveEvents(VersionedEventReceiverOptions) error
 }
 
+// VersionedEventDispatcher is responsible for routing events from the event manager to call handlers responsible for processing received events
+type VersionedEventDispatcher interface {
+	DispatchEvent(VersionedEvent) error
+	RegisterEventHandler(event interface{}, handler VersionedEventHandler)
+}
+
 // VersionedEventDispatchManager is responsible for coordinating receiving messages from event receivers and dispatching them to the event dispatcher.
 type VersionedEventDispatchManager struct {
 	versionedEventDispatcher *MapBasedVersionedEventDispatcher
@@ -33,9 +39,10 @@ type VersionedEventDispatchManager struct {
 	receiver                 VersionedEventReceiver
 }
 
-// VersionedEventTransactedAccept is the message routed from an event receiver to the event manager.
-// Sometimes event receivers designed with reliable delivery require acknowledgements after a message has been received. The success channel here allows for such acknowledgements
-type VersionedEventTransactedAccept struct {
+// VersionedEventReceived is the message routed from an event receiver to the event manager.
+// Sometimes event receivers designed with reliable delivery require acknowledgements after a message has been received.
+// The success channel here allows for such acknowledgements
+type VersionedEventReceived struct {
 	Event                 VersionedEvent
 	ProcessedSuccessfully chan bool
 }
@@ -45,13 +52,7 @@ type VersionedEventReceiverOptions struct {
 	TypeRegistry TypeRegistry
 	Close        chan chan error
 	Error        chan error
-	ReceiveEvent chan VersionedEventTransactedAccept
-}
-
-// VersionedEventDispatcher is responsible for routing events from the event manager to call handlers responsible for processing received events
-type VersionedEventDispatcher interface {
-	DispatchEvent(VersionedEvent) error
-	RegisterEventHandler(event interface{}, handler VersionedEventHandler)
+	ReceiveEvent chan VersionedEventReceived
 }
 
 // MapBasedVersionedEventDispatcher is a simple implementation of the versioned event dispatcher. Using a map it registered event handlers to event types
@@ -62,8 +63,8 @@ type MapBasedVersionedEventDispatcher struct {
 // VersionedEventHandler is a function that takes a versioned event
 type VersionedEventHandler func(VersionedEvent) error
 
-// NewVersionedEventDispatcher is a constructor for the MapBasedVersionedEventDispatcher
-func NewVersionedEventDispatcher() *MapBasedVersionedEventDispatcher {
+// NewMapBasedVersionedEventDispatcher is a constructor for the MapBasedVersionedEventDispatcher
+func NewMapBasedVersionedEventDispatcher() *MapBasedVersionedEventDispatcher {
 	registry := make(map[reflect.Type][]VersionedEventHandler)
 	return &MapBasedVersionedEventDispatcher{registry}
 }
@@ -96,7 +97,7 @@ func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) e
 // NewVersionedEventDispatchManager is a constructor for the VersionedEventDispatchManager
 func NewVersionedEventDispatchManager(receiver VersionedEventReceiver) *VersionedEventDispatchManager {
 	registry := newTypeRegistry()
-	return &VersionedEventDispatchManager{NewVersionedEventDispatcher(), registry, receiver}
+	return &VersionedEventDispatchManager{NewMapBasedVersionedEventDispatcher(), registry, receiver}
 }
 
 // RegisterEventHandler allows a caller to register an event handler given an event of the specified type being received
@@ -114,7 +115,7 @@ func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
 	// receiving errors from the listener thread (go routine)
 	errorChannel := make(chan error)
 	// and receiving events from the queue
-	receiveEventChannel := make(chan VersionedEventTransactedAccept)
+	receiveEventChannel := make(chan VersionedEventReceived)
 
 	// Start receiving events by passing these channels to the worker thread (go routine)
 	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveEventChannel}
