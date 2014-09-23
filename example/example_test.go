@@ -1,6 +1,7 @@
 package example_test
 
 import (
+	"code.google.com/p/go.crypto/bcrypt"
 	"errors"
 	"fmt"
 	"github.com/andrewwebber/cqrs"
@@ -16,12 +17,17 @@ type AccountCreatedEvent struct {
 	FirstName      string
 	LastName       string
 	EmailAddress   string
+	PasswordHash   []byte
 	InitialBalance float64
 }
 
 type EmailAddressChangedEvent struct {
 	PreviousEmailAddress string
 	NewEmailAddress      string
+}
+
+type PasswordChangedEvent struct {
+	NewPasswordHash []byte
 }
 
 type AccountCreditedEvent struct {
@@ -38,6 +44,7 @@ type Account struct {
 	FirstName    string
 	LastName     string
 	EmailAddress string
+	PasswordHash []byte
 	Balance      float64
 }
 
@@ -45,11 +52,11 @@ func (account *Account) String() string {
 	return fmt.Sprintf("Account %s with Email Address %s has balance %f", account.ID(), account.EmailAddress, account.Balance)
 }
 
-func NewAccount(firstName string, lastName string, emailAddress string, initialBalance float64) *Account {
+func NewAccount(firstName string, lastName string, emailAddress string, passwordHash []byte, initialBalance float64) *Account {
 	account := new(Account)
 	account.EventSourceBased = cqrs.NewEventSourceBased(account)
 
-	event := AccountCreatedEvent{firstName, lastName, emailAddress, initialBalance}
+	event := AccountCreatedEvent{firstName, lastName, emailAddress, passwordHash, initialBalance}
 	account.Update(event)
 	return account
 }
@@ -69,6 +76,7 @@ func (account *Account) HandleAccountCreatedEvent(event AccountCreatedEvent) {
 	account.EmailAddress = event.EmailAddress
 	account.FirstName = event.FirstName
 	account.LastName = event.LastName
+	account.PasswordHash = event.PasswordHash
 }
 
 func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
@@ -82,6 +90,55 @@ func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 
 func (account *Account) HandleEmailAddressChangedEvent(event EmailAddressChangedEvent) {
 	account.EmailAddress = event.NewEmailAddress
+}
+
+func (account *Account) CheckPassword(password string) bool {
+
+	passwordBytes := []byte(password)
+
+	// Comparing the password with the hash
+	err := bcrypt.CompareHashAndPassword(account.PasswordHash, passwordBytes)
+	fmt.Println(err) // nil means it is a match
+
+	return err == nil
+}
+
+func (account *Account) ChangePassword(newPassword string) error {
+	if len(newPassword) < 1 {
+		return errors.New("Invalid newPassword length")
+	}
+
+	hashedPassword, err := GetHashForPassword(newPassword)
+	if err != nil {
+		panic(err)
+	}
+
+	account.Update(PasswordChangedEvent{hashedPassword})
+
+	return nil
+}
+
+func GetHashForPassword(password string) ([]byte, error) {
+	fmt.Println("Password: ", password)
+
+	passwordBytes := []byte(password)
+
+	fmt.Println("Password bytes: ", passwordBytes)
+
+	// Hashing the password with the cost of 10
+	hashedPassword, err := bcrypt.GenerateFromPassword(passwordBytes, 10)
+	if err != nil {
+		fmt.Println("Error getting password hash: ", err)
+		return nil, err
+	}
+
+	fmt.Println(string(hashedPassword))
+
+	return hashedPassword, nil
+}
+
+func (account *Account) HandlePasswordChangedEvent(event PasswordChangedEvent) {
+	account.PasswordHash = event.NewPasswordHash
 }
 
 func (account *Account) Credit(amount float64) error {
@@ -143,14 +200,17 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "example_test", "testing.example")
 	repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
-	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{})
+	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	readModel := NewReadModelAccounts()
 
+	usersModel := NewUsersModel()
+
 	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
 	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
 		return nil
 	})
 
@@ -166,6 +226,12 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 
 	eventDispatcher.RegisterEventHandler(EmailAddressChangedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		return nil
+	})
+
+	eventDispatcher.RegisterEventHandler(PasswordChangedEvent{}, func(event cqrs.VersionedEvent) error {
+		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
 		return nil
 	})
 
@@ -174,22 +240,57 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 
 	readModel.LoadAccounts(persistance, repository)
 
+	usersModel.LoadUsers(persistance, repository)
+
 	log.Println("Loaded accounts")
 	log.Println(readModel)
+
+	log.Println("Loaded Users")
+	log.Println(usersModel)
 
 	log.Println("Create or find an account")
 	readModelAccount := readModel.Accounts[accountID]
 
+	log.Println(readModelAccount)
+
+	log.Println("Create or find a user")
+	user := usersModel.Users[accountID]
+
+	log.Println(user)
+
 	var account *Account
+
 	if readModelAccount == nil {
-		account = NewAccount("John", "Snow", "john.snow@cqrs.example", 0.0)
+		log.Println("Get hash for user...")
+
+		hashedPassword, err := GetHashForPassword("$ThisIsMyPassword1")
+
+		if err != nil {
+			t.Fatal("Error: ", err)
+		}
+
+		log.Println("Get hash for user...")
+
+		log.Println("Create new account...")
+		account = NewAccount("John", "Snow", "john.snow@cqrs.example", hashedPassword, 0.0)
+
+		log.Println("Set ID...")
 		account.SetID(accountID)
+
+		log.Println(account)
 	} else {
 		account, _ = NewAccountFromHistory(accountID, repository)
 	}
 
 	log.Println(account)
 	log.Println(readModel)
+	log.Println(usersModel)
+
+	account.ChangePassword("$ThisIsANOTHERPassword")
+
+	if !account.CheckPassword("$ThisIsANOTHERPassword") {
+		t.Fatal("Password is incorrect for account")
+	}
 
 	log.Println("Change email address and credit the account")
 	account.ChangeEmailAddress("john.snow@the.wall")
@@ -201,6 +302,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	log.Println("Persist the account")
 	repository.Save(account)
 	log.Println(readModel)
+	log.Println(usersModel)
 
 	log.Println("Load the account from history")
 	account, error := NewAccountFromHistory(accountID, repository)
@@ -222,6 +324,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	log.Println("Persist the account")
 	repository.Save(account)
 	log.Println(readModel)
+	log.Println(usersModel)
 
 	log.Println("Load the account from history")
 	account, error = NewAccountFromHistory(accountID, repository)
@@ -232,6 +335,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	// All events should have been replayed and the email address should be the latest
 	log.Println(account)
 	log.Println(readModel)
+	// log.Println(usersModel)
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
