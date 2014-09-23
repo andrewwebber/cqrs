@@ -18,7 +18,7 @@ type AccountReadModel struct {
 }
 
 func (account *AccountReadModel) String() string {
-	return fmt.Sprintf("ReadModel::Account %s with Email Address %s has balance %f", account.ID, account.EmailAddress, account.Balance)
+	return fmt.Sprintf("AccountModel::Account %s with Email Address %s has balance %f", account.ID, account.EmailAddress, account.Balance)
 }
 
 type ReadModelAccounts struct {
@@ -26,7 +26,7 @@ type ReadModelAccounts struct {
 }
 
 func (model *ReadModelAccounts) String() string {
-	result := "ReadModel::"
+	result := "Account Model::"
 	for key := range model.Accounts {
 		result += model.Accounts[key].String() + "\n"
 	}
@@ -64,7 +64,7 @@ func NewReadModelAccountsFromHistory(events []cqrs.VersionedEvent) (*ReadModelAc
 
 func (model *ReadModelAccounts) UpdateViewModel(events []cqrs.VersionedEvent) error {
 	for _, event := range events {
-		log.Println("ViewModel received event : ", event)
+		log.Println("Accounts Model received event : ", event.EventType)
 		switch event.Event.(type) {
 		default:
 		case AccountCreatedEvent:
@@ -96,13 +96,25 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountCreatedEvent(accountID s
 }
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
+	if model.Accounts[accountID] == nil {
+		return
+	}
+
 	model.Accounts[accountID].Balance += event.Amount
 }
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
+	if model.Accounts[accountID] == nil {
+		return
+	}
+
 	model.Accounts[accountID].Balance -= event.Amount
 }
 
 func (model *ReadModelAccounts) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
+	if model.Accounts[accountID] == nil {
+		return
+	}
+
 	model.Accounts[accountID].EmailAddress = event.NewEmailAddress
 }
