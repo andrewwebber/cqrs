@@ -1,7 +1,16 @@
 // Package cqrs provides a CQRS and Event Sourcing framework written in go influenced by the cqrs journey guide
 //
-// Current version: experimental
+// For a full guide visit http://github.com/andrewwebber/cqrs
 //
-// For more in depth information on the CQRS journey visit the reference documentation
-// at http://msdn.microsoft.com/en-us/library/jj554200.aspx
+// import "github.com/andrewwebber/cqrs"
+//
+// func NewAccount(firstName string, lastName string, emailAddress string, passwordHash []byte, initialBalance float64) *Account {
+//   account := new(Account)
+//   account.EventSourceBased = cqrs.NewEventSourceBased(account)
+//
+//   event := AccountCreatedEvent{firstName, lastName, emailAddress, passwordHash, initialBalance}
+//   account.Update(event)
+//   return account
+// }
+
 package cqrs

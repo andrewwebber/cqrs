@@ -150,7 +150,7 @@ func TestScenario(t *testing.T) {
 	log.Println(account)
 	log.Println(readModel)
 	log.Println(usersModel)
-	// log.Println(usersModel)
+
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
