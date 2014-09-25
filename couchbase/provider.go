@@ -61,7 +61,7 @@ func (r repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
 	return r.bucket.Set(sourceID, 0, latestVersion)
 }
 
-// Get retrieves an event sourced object by ID
+// Get retrieves events assoicated with an event sourced object by ID
 func (r repository) Get(id string, typeRegistry cqrs.TypeRegistry) ([]cqrs.VersionedEvent, error) {
 	var version int
 	if error := r.bucket.Get(id, &version); error != nil {

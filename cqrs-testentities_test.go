@@ -100,7 +100,7 @@ func (account *Account) CheckPassword(password string) bool {
 
 func (account *Account) ChangePassword(newPassword string) error {
 	if len(newPassword) < 1 {
-		return errors.New("Invalid newPassword length")
+		return errors.New("invalid newPassword length")
 	}
 
 	hashedPassword, err := GetHashForPassword(newPassword)
@@ -133,7 +133,7 @@ func (account *Account) HandlePasswordChangedEvent(event PasswordChangedEvent) {
 
 func (account *Account) Credit(amount float64) error {
 	if amount <= 0 {
-		return errors.New("Invalid amount - negative credits not supported")
+		return errors.New("invalid amount - negative credits not supported")
 	}
 
 	account.Update(AccountCreditedEvent{amount})
@@ -147,11 +147,11 @@ func (account *Account) HandleAccountCredited(event AccountCreditedEvent) {
 
 func (account *Account) Debit(amount float64) error {
 	if amount <= 0 {
-		return errors.New("Invalid amount - negative credits not supported")
+		return errors.New("invalid amount - negative credits not supported")
 	}
 
 	if projection := account.Balance - amount; projection < 0 {
-		return errors.New("Negative balance not supported")
+		return errors.New("negative balance not supported")
 	}
 
 	account.Update(AccountDebitedEvent{amount})
