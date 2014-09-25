@@ -7,8 +7,8 @@ import (
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rabbit"
-	"github.com/andrewwebber/cqrs/rethinkdb"
-	r "github.com/dancannon/gorethink"
+	// "github.com/andrewwebber/cqrs/rethinkdb"
+	// r "github.com/dancannon/gorethink"
 	"log"
 	"testing"
 )
@@ -173,20 +173,20 @@ func (account *Account) HandleAccountDebitedEvent(event AccountDebitedEvent) {
 	account.Balance -= event.Amount
 }
 
-func TestEventSourcingWithRethinkdb(t *testing.T) {
-	connectOps := r.ConnectOpts{Address: "localhost:28015", Database: "cqrs"}
-	session, error := r.Connect(connectOps)
-	r.Table("events").Delete().Run(session)
-
-	persistance, error := rethinkdb.NewEventStreamRepository(connectOps, "events")
-	if error != nil {
-		t.Fatal(error)
-	}
-
-	r.Table("events").Delete().Run(session)
-
-	RunScenario(t, persistance)
-}
+// func TestEventSourcingWithRethinkdb(t *testing.T) {
+// 	connectOps := r.ConnectOpts{Address: "localhost:28015", Database: "cqrs"}
+// 	session, error := r.Connect(connectOps)
+// 	r.Table("events").Delete().Run(session)
+//
+// 	persistance, error := rethinkdb.NewEventStreamRepository(connectOps, "events")
+// 	if error != nil {
+// 		t.Fatal(error)
+// 	}
+//
+// 	r.Table("events").Delete().Run(session)
+//
+// 	RunScenario(t, persistance)
+// }
 
 func TestEventSourcingWithCouchbase(t *testing.T) {
 	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/")
