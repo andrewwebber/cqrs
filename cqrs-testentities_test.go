@@ -76,7 +76,7 @@ func (account *Account) HandleAccountCreatedEvent(event AccountCreatedEvent) {
 
 func (account *Account) ChangeEmailAddress(newEmailAddress string) error {
 	if len(newEmailAddress) < 1 {
-		return errors.New("Invalid newEmailAddress length")
+		return errors.New("invalid newEmailAddress length")
 	}
 
 	account.Update(EmailAddressChangedEvent{account.EmailAddress, newEmailAddress})
