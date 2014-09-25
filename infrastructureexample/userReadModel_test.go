@@ -1,4 +1,4 @@
-package example_test
+package infastructureexample_test
 
 import (
 	"encoding/json"
