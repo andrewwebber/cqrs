@@ -1,7 +1,8 @@
 CQRS framework in go
 =======
 [![GoDoc](https://godoc.org/github.com/andrewwebber/cqrs?status.svg)](https://godoc.org/github.com/andrewwebber/cqrs)
-[![Build Status](https://drone.io/github.com/andrewwebber/cqrs/status.png)](https://drone.io/github.com/andrewwebber/cqrs/latest)
+[![Build Status](https://drone.io/github.com/andrewwebber/cqrs/status.png?foo=bar)](https://drone.io/github.com/andrewwebber/cqrs/latest)
+
 [Example test scenario (inmemory)](https://github.com/andrewwebber/cqrs/blob/master/cqrs_test.go)
 [Example test scenario (couchbase, rabbitmq)](https://github.com/andrewwebber/cqrs/blob/master/infrastructureexample/example_test.go)
 
