@@ -3,10 +3,22 @@ CQRS framework in go
 [![GoDoc](https://godoc.org/github.com/andrewwebber/cqrs?status.svg)](https://godoc.org/github.com/andrewwebber/cqrs)
 [![Build Status](https://drone.io/github.com/andrewwebber/cqrs/status.png?foo=bar)](https://drone.io/github.com/andrewwebber/cqrs/latest)
 
+#Project Summary
+The package provides a framework for quickly implementing a CQRS style application.
+The framework attempts to provides helpful functions to facilitate:
+- Event Sourcing
+- Command issuing and processing
+- Event publishing
+- Read model generation from published events
+
+---
+
+## Example code
 [Example test scenario (inmemory)](https://github.com/andrewwebber/cqrs/blob/master/cqrs_test.go)
+
 [Example test scenario (couchbase, rabbitmq)](https://github.com/andrewwebber/cqrs/blob/master/infrastructureexample/example_test.go)
 
-## Example Bank Account Scenario
+## Test Scenario
 The example test scenario is of a simple bank account that seeks to track, using event sourcing, a
 customers balance and login password
 
@@ -50,7 +62,7 @@ func (account *Account) HandleAccountCreatedEvent(event AccountCreatedEvent) {
   account.PasswordHash = event.PasswordHash
 }
 ```
-The above code results in an account object being created with one single **pending** event (AccountCreatedEvent)
+The above code results in an account object being created with one single **pending** event namely **AccountCreatedEvent**.
 Events will then be persisted once saved to an event sourcing repository.
 If a repository is created with an event publisher then events saved for the purposes of event sourcing will also be published
 ```go
