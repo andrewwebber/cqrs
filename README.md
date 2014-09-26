@@ -118,10 +118,12 @@ type User struct {
 ```
 
 ## Infrastructure
-There are three main elements to the CQRS infrastructure
+There are a number of key elements to the CQRS infrastructure.
 - Event sourcing repository (a repository for event sourcing based business objects)
 - Event publisher (publishes new events to an event bus)
 - Event handler (dispatches received events to call handlers)
+- Command publisher (publisher new commands to a command bus)
+- Command handler (dispatches received commands to call handlers)
 
 ```go
 persistance := cqrs.NewInMemoryEventStreamRepository()
@@ -141,6 +143,15 @@ eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
 eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
   readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
   usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+  return nil
+})
+```
+
+We can also register a **global** handler to be called for all events. This becomes useful when logging system wide events
+```go
+integrationEventsLog := cqrs.NewInMemoryEventStreamRepository()
+eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
+  integrationEventsLog.SaveIntegrationEvent(event)
   return nil
 })
 ```
@@ -177,3 +188,8 @@ if account.Balance != readModel.Accounts[accountID].Balance {
   t.Fatal("Expected readmodel to be synced with write model")
 }
 ```
+
+## Coming Soon
+- Commands
+- Command Bus
+- Command handler

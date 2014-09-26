@@ -19,15 +19,8 @@ func NewInMemoryEventStreamRepository() *InMemoryEventStreamRepository {
 
 // AllEventsEverPublished returns all events ever published
 func (r *InMemoryEventStreamRepository) AllEventsEverPublished() ([]VersionedEvent, error) {
-	var log []VersionedEvent
-	for key := range r.store {
-		for _, event := range r.store[key] {
-			log = append(log, event)
-		}
-	}
-
+	log := r.integrationEvents
 	sort.Sort(ByCreated(log))
-
 	return log, nil
 }
 
