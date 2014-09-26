@@ -18,6 +18,12 @@ func TestScenario(t *testing.T) {
 	usersModel := NewUsersModel()
 
 	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
+
+	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
+		persistance.SaveIntegrationEvent(event)
+		return nil
+	})
+
 	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
 		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
@@ -160,4 +166,13 @@ func TestScenario(t *testing.T) {
 	}
 
 	stopChannel <- true
+
+	log.Println("Dump history - integration events")
+	if history, err := persistance.AllEventsEverPublished(); err != nil {
+		t.Fatal(err)
+	} else {
+		for _, event := range history {
+			log.Println(event)
+		}
+	}
 }

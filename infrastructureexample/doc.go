@@ -1,4 +1,4 @@
-// Package infastructureexample_test provides the example scenario utilizing couchbase and rabbitmq infastructure components
+// Package infrastructureexample provides the example scenario utilizing couchbase and rabbitmq infastructure components
 //
 //
 //  func TestEventSourcingWithCouchbase(t *testing.T) {
@@ -15,4 +15,4 @@
 //    repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
 //    ...
 //  }
-package infastructureexample_test
+package infrastructureexample

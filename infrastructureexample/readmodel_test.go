@@ -1,4 +1,4 @@
-package infastructureexample_test
+package infrastructureexample_test
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ func (model *ReadModelAccounts) String() string {
 	return result
 }
 
-func (model *ReadModelAccounts) LoadAccounts(persistance cqrs.EventStreamRepository, repository cqrs.TypeRegistry) {
+func (model *ReadModelAccounts) LoadAccounts(persistance cqrs.VersionedEventPublicationLogger) {
 	readBytes, error := ioutil.ReadFile("/tmp/accounts.json")
 
 	if !os.IsNotExist(error) {
@@ -42,7 +42,7 @@ func (model *ReadModelAccounts) LoadAccounts(persistance cqrs.EventStreamReposit
 		json.Unmarshal(readBytes, &model.Accounts)
 	} else {
 		log.Println("Replaying events from repository")
-		events, error := persistance.Get("5058e029-d329-4c4b-b111-b042e48b0c5f", repository)
+		events, error := persistance.AllEventsEverPublished()
 		if error == nil {
 			model.UpdateViewModel(events)
 		}

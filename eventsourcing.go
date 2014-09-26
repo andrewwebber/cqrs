@@ -18,7 +18,7 @@ type EventSourcingRepository interface {
 // EventStreamRepository is a persistance layer for events associated with aggregates by ID
 type EventStreamRepository interface {
 	Save(string, []VersionedEvent) error
-	Get(string, TypeRegistry) ([]VersionedEvent, error)
+	Get(string) ([]VersionedEvent, error)
 }
 
 type defaultEventSourcingRepository struct {
@@ -72,7 +72,7 @@ func (r defaultEventSourcingRepository) Save(source EventSourced) error {
 }
 
 func (r defaultEventSourcingRepository) Get(id string, source EventSourced) error {
-	events, error := r.EventRepository.Get(id, r)
+	events, error := r.EventRepository.Get(id)
 	if error != nil {
 		return error
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/couchbaselabs/go-couchbase"
 	"log"
 	"reflect"
+	"sort"
 	"time"
 )
 
@@ -20,13 +21,13 @@ type cbVersionedEvent struct {
 	Event     json.RawMessage
 }
 
-// Repository : a Couchbase Server event stream repository
-type repository struct {
+// EventStreamRepository : a Couchbase Server event stream repository
+type EventStreamRepository struct {
 	bucket *couchbase.Bucket
 }
 
 // NewEventStreamRepository creates new Couchbase Server based event stream repository
-func NewEventStreamRepository(connectionString string) (cqrs.EventStreamRepository, error) {
+func NewEventStreamRepository(connectionString string) (*EventStreamRepository, error) {
 	c, err := couchbase.Connect(connectionString)
 	if err != nil {
 		log.Println(fmt.Sprintf("Error connecting to couchbase : %v", err))
@@ -45,15 +46,15 @@ func NewEventStreamRepository(connectionString string) (cqrs.EventStreamReposito
 		return nil, err
 	}
 
-	return repository{bucket}, nil
+	return &EventStreamRepository{bucket}, nil
 }
 
 // Save persists an event sourced object into the repository
-func (r repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
+func (r *EventStreamRepository) Save(sourceID string, events []cqrs.VersionedEvent) error {
 	latestVersion := events[len(events)-1].Version
 	for _, versionedEvent := range events {
 		key := fmt.Sprintf("%s:%d", sourceID, versionedEvent.Version)
-		if error := r.bucket.Set(key, 0, versionedEvent); error != nil {
+		if added, error := r.bucket.Add(key, 0, versionedEvent); error != nil || !added {
 			return error
 		}
 	}
@@ -61,8 +62,48 @@ func (r repository) Save(sourceID string, events []cqrs.VersionedEvent) error {
 	return r.bucket.Set(sourceID, 0, latestVersion)
 }
 
+// SaveIntegrationEvent persists a published integration event
+func (r *EventStreamRepository) SaveIntegrationEvent(event cqrs.VersionedEvent) error {
+	counter, err := r.bucket.Incr("integration", 1, 1, 0)
+	if err != nil {
+		return err
+	}
+
+	key := fmt.Sprintf("integration::%d", counter)
+	if err = r.bucket.Set(key, 0, event); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AllEventsEverPublished retreives all events every persisted
+func (r *EventStreamRepository) AllEventsEverPublished() ([]cqrs.VersionedEvent, error) {
+	var counter int
+	if err := r.bucket.Get("integration", &counter); err != nil {
+		return nil, err
+	}
+
+	var result []cqrs.VersionedEvent
+	for i := 0; i < counter; i++ {
+		key := fmt.Sprintf("integration::%d", i)
+		events, err := r.Get(key)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, event := range events {
+			result = append(result, event)
+		}
+	}
+
+	sort.Sort(cqrs.ByCreated(result))
+
+	return result, nil
+}
+
 // Get retrieves events assoicated with an event sourced object by ID
-func (r repository) Get(id string, typeRegistry cqrs.TypeRegistry) ([]cqrs.VersionedEvent, error) {
+func (r *EventStreamRepository) Get(id string) ([]cqrs.VersionedEvent, error) {
 	var version int
 	if error := r.bucket.Get(id, &version); error != nil {
 		log.Println("Error getting event source ", id)
@@ -78,6 +119,8 @@ func (r repository) Get(id string, typeRegistry cqrs.TypeRegistry) ([]cqrs.Versi
 			log.Println("Error getting event :", eventKey)
 			return nil, error
 		}
+
+		typeRegistry := cqrs.NewTypeRegistry()
 
 		eventType, ok := typeRegistry.GetEventType(raw.EventType)
 		if !ok {

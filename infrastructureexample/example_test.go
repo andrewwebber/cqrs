@@ -1,4 +1,4 @@
-package infastructureexample_test
+package infrastructureexample_test
 
 import (
 	"code.google.com/p/go.crypto/bcrypt"
@@ -11,6 +11,7 @@ import (
 	// r "github.com/dancannon/gorethink"
 	"log"
 	"testing"
+	"time"
 )
 
 type AccountCreatedEvent struct {
@@ -194,10 +195,10 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 		t.Fatal(error)
 	}
 
-	RunScenario(t, persistance)
+	RunScenario(t, persistance, persistance)
 }
 
-func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
+func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrationEvents cqrs.VersionedEventPublicationLogger) {
 	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "example_test", "testing.example")
 	repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
 	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
@@ -208,6 +209,11 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	usersModel := NewUsersModel()
 
 	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
+	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
+		integrationEvents.SaveIntegrationEvent(event)
+		return nil
+	})
+
 	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
 		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
@@ -238,9 +244,9 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	stopChannel := make(chan bool)
 	go eventDispatcher.Listen(stopChannel)
 
-	readModel.LoadAccounts(persistance, repository)
+	readModel.LoadAccounts(integrationEvents)
 
-	usersModel.LoadUsers(persistance, repository)
+	usersModel.LoadUsers(integrationEvents)
 
 	log.Println("Loaded accounts")
 	log.Println(readModel)
@@ -332,6 +338,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 		t.Fatal(error)
 	}
 
+	time.Sleep(100 * time.Millisecond)
 	// All events should have been replayed and the email address should be the latest
 	log.Println(account)
 	log.Println(readModel)

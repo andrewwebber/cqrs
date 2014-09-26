@@ -16,6 +16,19 @@ type VersionedEvent struct {
 	Event     interface{}
 }
 
+// ByCreated is an alias for sorting VersionedEvents by the create field
+type ByCreated []VersionedEvent
+
+func (c ByCreated) Len() int           { return len(c) }
+func (c ByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+func (c ByCreated) Less(i, j int) bool { return c[i].Created.Before(c[j].Created) }
+
+// VersionedEventPublicationLogger is responsible to retreiving all events ever published to facilitate readmodel reconstruction
+type VersionedEventPublicationLogger interface {
+	SaveIntegrationEvent(VersionedEvent) error
+	AllEventsEverPublished() ([]VersionedEvent, error)
+}
+
 // VersionedEventPublisher is responsible for publishing events that have been saved to the event store\repository
 type VersionedEventPublisher interface {
 	PublishEvents([]VersionedEvent) error
@@ -52,11 +65,13 @@ type VersionedEventReceiverOptions struct {
 type VersionedEventDispatcher interface {
 	DispatchEvent(VersionedEvent) error
 	RegisterEventHandler(event interface{}, handler VersionedEventHandler)
+	RegisterGlobalHandler(handler VersionedEventHandler)
 }
 
 // MapBasedVersionedEventDispatcher is a simple implementation of the versioned event dispatcher. Using a map it registered event handlers to event types
 type MapBasedVersionedEventDispatcher struct {
-	registry map[reflect.Type][]VersionedEventHandler
+	registry       map[reflect.Type][]VersionedEventHandler
+	globalHandlers []VersionedEventHandler
 }
 
 // VersionedEventHandler is a function that takes a versioned event
@@ -65,7 +80,7 @@ type VersionedEventHandler func(VersionedEvent) error
 // NewVersionedEventDispatcher is a constructor for the MapBasedVersionedEventDispatcher
 func NewVersionedEventDispatcher() *MapBasedVersionedEventDispatcher {
 	registry := make(map[reflect.Type][]VersionedEventHandler)
-	return &MapBasedVersionedEventDispatcher{registry}
+	return &MapBasedVersionedEventDispatcher{registry, []VersionedEventHandler{}}
 }
 
 // RegisterEventHandler allows a caller to register an event handler given an event of the specified type being received
@@ -79,6 +94,11 @@ func (m *MapBasedVersionedEventDispatcher) RegisterEventHandler(event interface{
 	}
 }
 
+// RegisterGlobalHandler allows a caller to register a wildcard event handler call on any event received
+func (m *MapBasedVersionedEventDispatcher) RegisterGlobalHandler(handler VersionedEventHandler) {
+	m.globalHandlers = append(m.globalHandlers, handler)
+}
+
 // DispatchEvent executes all event handlers registered for the given event type
 func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) error {
 	eventType := reflect.TypeOf(event.Event)
@@ -87,6 +107,12 @@ func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) e
 			if err := handler(event); err != nil {
 				return err
 			}
+		}
+	}
+
+	for _, handler := range m.globalHandlers {
+		if err := handler(event); err != nil {
+			return err
 		}
 	}
 
@@ -103,6 +129,11 @@ func NewVersionedEventDispatchManager(receiver VersionedEventReceiver) *Versione
 func (m *VersionedEventDispatchManager) RegisterEventHandler(event interface{}, handler VersionedEventHandler) {
 	m.typeRegistry.RegisterType(event)
 	m.versionedEventDispatcher.RegisterEventHandler(event, handler)
+}
+
+// RegisterGlobalHandler allows a caller to register a wildcard event handler call on any event received
+func (m *VersionedEventDispatchManager) RegisterGlobalHandler(handler VersionedEventHandler) {
+	m.versionedEventDispatcher.RegisterGlobalHandler(handler)
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests

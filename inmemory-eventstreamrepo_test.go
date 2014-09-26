@@ -35,4 +35,10 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 	if string(accountFromHistory.PasswordHash) != string(account.PasswordHash) {
 		t.Fatal("Expected PasswordHash to match")
 	}
+
+	if events, err := persistance.AllEventsEverPublished(); err != nil {
+		t.Fatal(err)
+	} else {
+		log.Println(events)
+	}
 }

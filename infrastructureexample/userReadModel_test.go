@@ -1,4 +1,4 @@
-package infastructureexample_test
+package infrastructureexample_test
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type User struct {
 }
 
 func (user *User) String() string {
-	return fmt.Sprintf("UserModel::User %s with Email Address %s and Password Hash %f", user.ID, user.EmailAddress, user.PasswordHash)
+	return fmt.Sprintf("UserModel::User %s with Email Address %s and Password Hash %v", user.ID, user.EmailAddress, user.PasswordHash)
 }
 
 type UsersModel struct {
@@ -34,7 +34,7 @@ func (model *UsersModel) String() string {
 	return result
 }
 
-func (model *UsersModel) LoadUsers(persistance cqrs.EventStreamRepository, repository cqrs.TypeRegistry) {
+func (model *UsersModel) LoadUsers(persistance cqrs.VersionedEventPublicationLogger) {
 	readBytes, error := ioutil.ReadFile("/tmp/users.json")
 
 	if !os.IsNotExist(error) {
@@ -42,7 +42,7 @@ func (model *UsersModel) LoadUsers(persistance cqrs.EventStreamRepository, repos
 		json.Unmarshal(readBytes, &model.Users)
 	} else {
 		log.Println("Replaying events from repository")
-		events, error := persistance.Get("5058e029-d329-4c4b-b111-b042e48b0c5f", repository)
+		events, error := persistance.AllEventsEverPublished()
 		if error == nil {
 			model.UpdateViewModel(events)
 		}
