@@ -14,8 +14,8 @@ The are two make areas of concern at the application level, the **Write model** 
 The read model is aimed to facilitate fast reads (read model projections)
 The write model is where the business logic get executed and asynchronously notifies the read models
 
-## Write model
-### Account Aggregate
+## Write model - Using Event Sourcing
+### Account
 ```go
 type Account struct {
   cqrs.EventSourceBased
