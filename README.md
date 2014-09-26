@@ -122,16 +122,17 @@ There are a number of key elements to the CQRS infrastructure.
 - Event sourcing repository (a repository for event sourcing based business objects)
 - Event publisher (publishes new events to an event bus)
 - Event handler (dispatches received events to call handlers)
-- Command publisher (publisher new commands to a command bus)
+- Command publisher (publishes new commands to a command bus)
 - Command handler (dispatches received commands to call handlers)
 
+### Event sourcing and integration events
+Nested packages within this repository show example implementations using Couchbase Server and RabbitMQ.
+The core library includes in-memory implementations for testing and quick prototyping
 ```go
 persistance := cqrs.NewInMemoryEventStreamRepository()
 bus := cqrs.NewInMemoryEventBus()
 repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
 ```
-
-Nested packages within this repository show example implementations using Couchbase Server and RabbitMQ
 
 With the infrastructure implementations instantiated a stock event dispatcher is provided to route received
 events to call handlers
@@ -147,38 +148,60 @@ eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.Vers
 })
 ```
 
-We can also register a **global** handler to be called for all events. This becomes useful when logging system wide events
+We can also register a **global** handler to be called for all events.
+This becomes useful when logging system wide events and when our read models are smart enough to filter out irrelevant events
 ```go
 integrationEventsLog := cqrs.NewInMemoryEventStreamRepository()
 eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
   integrationEventsLog.SaveIntegrationEvent(event)
+  readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+  usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
   return nil
 })
 ```
 
-Within your read models the idea is that you implement updating your pre-pared read model based upon the
+Within your read models the idea is that you implement the updating of your pre-pared read model based upon the
 incoming event notifications
 
-The test example looks to make changes to the write side and monitor the read models becoming eventually
-consistant
-```go
-log.Println("Change the email address, credit 150, debit 200")
-lastEmailAddress := "john.snow@golang.org"
-account.ChangeEmailAddress(lastEmailAddress)
-account.Credit(150)
-account.Debit(200)
-log.Println(account)
-log.Println(readModel)
+### Commands
 
-log.Println("Persist the account")
-repository.Save(account)
-log.Println("Dump models")
-log.Println(account)
-log.Println(readModel)
-log.Println(usersModel)
+Commands are processed by command handlers similar to event handlers.
+We can make direct changes to our write model and indirect changes to our read models by correctly processing commands and then raising integration events upon command completion.
+
+```go
+commandBus := cqrs.NewInMemoryCommandBus()
+commandDispatcher := cqrs.NewCommandDispatchManager(commandBus)
+RegisterCommandHandlers(commandDispatcher, repository)
 ```
 
-As the read models become consistant we check at the end of the test if everything is in sync
+Commands can be issued using a command bus. Typically a command is a simple struct.
+The application layer command struct is then wrapped within a cqrs.Command using the cqrs.CreateCommand helper function
+
+```go
+changePasswordCommand := cqrs.CreateCommand(
+  ChangePasswordCommand{accountID, "$ThisIsANOTHERPassword"})
+commandBus.PublishCommands([]cqrs.Command{changePasswordCommand})
+```
+
+The corresponding command handler for the **ChangePassword** command plays the role of a DDD aggregate root; responsible for the consistency and lifetime of aggregates and entities within the system)
+```go
+commandDispatcher.RegisterCommandHandler(ChangePasswordCommand{}, func(command cqrs.Command) error {
+  changePasswordCommand := command.Body.(ChangePasswordCommand)
+  // Load account from storage
+  account, err := NewAccountFromHistory(changePasswordCommand.AccountID, repository)
+  if err != nil {
+    return err
+  }
+
+  account.ChangePassword(changePasswordCommand.NewPassword)
+
+  // Persist new events
+  repository.Save(account)  
+  return nil
+})
+```
+
+As the read models become consistant, within the tests, we check at the end of the test if everything is in sync
 ```go
 if account.EmailAddress != lastEmailAddress {
   t.Fatal("Expected emailaddress to be ", lastEmailAddress)
@@ -188,8 +211,3 @@ if account.Balance != readModel.Accounts[accountID].Balance {
   t.Fatal("Expected readmodel to be synced with write model")
 }
 ```
-
-## Coming Soon
-- Commands
-- Command Bus
-- Command handler

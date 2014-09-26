@@ -50,6 +50,7 @@ func (model *ReadModelAccounts) UpdateViewModel(events []cqrs.VersionedEvent) er
 		log.Println(golorize.Magenta("Accounts Model received event : " + event.EventType))
 		switch event.Event.(type) {
 		default:
+			return nil
 		case AccountCreatedEvent:
 			model.UpdateViewModelOnAccountCreatedEvent(event.SourceID, event.Event.(AccountCreatedEvent))
 		case AccountCreditedEvent:
@@ -138,6 +139,7 @@ func (model *UsersModel) UpdateViewModel(events []cqrs.VersionedEvent) error {
 		log.Println("User Model received event : ", event.EventType)
 		switch event.Event.(type) {
 		default:
+			return nil
 		case AccountCreatedEvent:
 			model.UpdateViewModelOnAccountCreatedEvent(event.SourceID, event.Event.(AccountCreatedEvent))
 		case EmailAddressChangedEvent:

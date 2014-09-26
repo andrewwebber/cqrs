@@ -137,32 +137,7 @@ func TestScenario(t *testing.T) {
 func RegisterIntegrationEventHandlers(eventDispatcher *cqrs.VersionedEventDispatchManager, integrationEventsLog cqrs.VersionedEventPublicationLogger, readModel *ReadModelAccounts, usersModel *UsersModel) {
 	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
 		integrationEventsLog.SaveIntegrationEvent(event)
-		return nil
-	})
-
-	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		return nil
-	})
-
-	eventDispatcher.RegisterEventHandler(AccountCreditedEvent{}, func(event cqrs.VersionedEvent) error {
-		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		return nil
-	})
-
-	eventDispatcher.RegisterEventHandler(AccountDebitedEvent{}, func(event cqrs.VersionedEvent) error {
-		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		return nil
-	})
-
-	eventDispatcher.RegisterEventHandler(EmailAddressChangedEvent{}, func(event cqrs.VersionedEvent) error {
-		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		return nil
-	})
-
-	eventDispatcher.RegisterEventHandler(PasswordChangedEvent{}, func(event cqrs.VersionedEvent) error {
 		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
 		return nil
 	})
