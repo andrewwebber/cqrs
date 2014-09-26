@@ -28,7 +28,7 @@ type Account struct {
 }
 ```
 To compensate for golang's lack of inheritance, a combination of type embedding and a call convention
-pattern are utilized
+pattern are utilized.
 
 ```go
 func NewAccount(firstName string, lastName string, emailAddress string, passwordHash []byte, initialBalance float64) *Account {
@@ -39,6 +39,26 @@ func NewAccount(firstName string, lastName string, emailAddress string, password
   account.Update(event)
   return account
 }
+```
+The 'attached' Update function being called above will now provide the infrastructure for routing events to event handlers.
+A function prefixed with 'Handle' and named with the name of the event expected with be called by the infrastructure.
+```go
+func (account *Account) HandleAccountCreatedEvent(event AccountCreatedEvent) {
+  account.EmailAddress = event.EmailAddress
+  account.FirstName = event.FirstName
+  account.LastName = event.LastName
+  account.PasswordHash = event.PasswordHash
+}
+```
+The above code results in an account object being created with one single **pending** event (AccountCreatedEvent)
+Events will then be persisted once saved to an event sourcing repository.
+If a repository is created with an event publisher then events saved for the purposes of event sourcing will also be published
+```go
+persistance := cqrs.NewInMemoryEventStreamRepository()
+bus := cqrs.NewInMemoryEventBus()
+repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
+...
+repository.Save(account)
 ```
 
 ### Account Events
@@ -68,8 +88,8 @@ type AccountDebitedEvent struct {
   Amount float64
 }
 ```
-Events souring events are raised using the embedded **Update** function. These events will also be published
-to the read models
+Events souring events are raised using the embedded **Update** function. These events will eventually be published to the read models indirectly via an event bus
+
 ```go
 func (account *Account) ChangePassword(newPassword string) error {
   if len(newPassword) < 1 {
@@ -85,7 +105,13 @@ func (account *Account) ChangePassword(newPassword string) error {
 
   return nil
 }
+
+func (account *Account) HandlePasswordChangedEvent(event PasswordChangedEvent) {
+  account.PasswordHash = event.NewPasswordHash
+}
 ```
+
+Again the calling convention routes our **PasswordChangedEvent** to the corresponding **HandlePasswordChangedEvent** instance function
 
 ## Read Model
 ### Accounts projection
