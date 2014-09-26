@@ -13,12 +13,13 @@ import (
 )
 
 type cbVersionedEvent struct {
-	ID        string    `json:"id"`
-	SourceID  string    `json:"sourceID"`
-	Version   int       `json:"version"`
-	EventType string    `json:"eventType"`
-	Created   time.Time `json:"time"`
-	Event     json.RawMessage
+	ID            string    `json:"id"`
+	CorrelationID string    `json:"correlationID"`
+	SourceID      string    `json:"sourceID"`
+	Version       int       `json:"version"`
+	EventType     string    `json:"eventType"`
+	Created       time.Time `json:"time"`
+	Event         json.RawMessage
 }
 
 // EventStreamRepository : a Couchbase Server event stream repository

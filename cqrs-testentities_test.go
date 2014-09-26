@@ -8,6 +8,34 @@ import (
 	"log"
 )
 
+type ChangeEmailAddressCommand struct {
+	AccountID       string
+	NewEmailAddress string
+}
+
+type CreateAccountCommand struct {
+	FirstName      string
+	LastName       string
+	EmailAddress   string
+	PasswordHash   []byte
+	InitialBalance float64
+}
+
+type ChangePasswordCommand struct {
+	AccountID   string
+	NewPassword string
+}
+
+type CreditAccountCommand struct {
+	AccountID string
+	Amount    float64
+}
+
+type DebitAccountCommand struct {
+	AccountID string
+	Amount    float64
+}
+
 type AccountCreatedEvent struct {
 	FirstName      string
 	LastName       string

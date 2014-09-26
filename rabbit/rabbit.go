@@ -12,12 +12,13 @@ import (
 )
 
 type RawVersionedEvent struct {
-	ID        string    `json:"id"`
-	SourceID  string    `json:"sourceID"`
-	Version   int       `json:"version"`
-	EventType string    `json:"eventType"`
-	Created   time.Time `json:"time"`
-	Event     json.RawMessage
+	ID            string    `json:"id"`
+	CorrelationID string    `json:"correlationID"`
+	SourceID      string    `json:"sourceID"`
+	Version       int       `json:"version"`
+	EventType     string    `json:"eventType"`
+	Created       time.Time `json:"time"`
+	Event         json.RawMessage
 }
 
 type EventBus struct {
@@ -115,12 +116,13 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 								options.Error <- errors.New("Error deserializing event " + raw.EventType)
 							} else {
 								versionedEvent := cqrs.VersionedEvent{
-									ID:        raw.ID,
-									SourceID:  raw.SourceID,
-									Version:   raw.Version,
-									EventType: raw.EventType,
-									Created:   raw.Created,
-									Event:     reflect.Indirect(eventValue).Interface()}
+									ID:            raw.ID,
+									CorrelationID: raw.CorrelationID,
+									SourceID:      raw.SourceID,
+									Version:       raw.Version,
+									EventType:     raw.EventType,
+									Created:       raw.Created,
+									Event:         reflect.Indirect(eventValue).Interface()}
 								ackCh := make(chan bool)
 								log.Println("EventBus.Dispatching Message")
 								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}

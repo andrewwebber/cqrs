@@ -61,4 +61,8 @@ func TestInMemoryEventBus(t *testing.T) {
 	case err := <-errorChannel:
 		t.Fatal(err)
 	}
+
+	closeResponse := make(chan error)
+	closeChannel <- closeResponse
+	<-closeResponse
 }

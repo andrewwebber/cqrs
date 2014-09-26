@@ -8,12 +8,13 @@ import (
 
 // VersionedEvent represents an event in the past for an aggregate
 type VersionedEvent struct {
-	ID        string    `json:"id"`
-	SourceID  string    `json:"sourceID"`
-	Version   int       `json:"version"`
-	EventType string    `json:"eventType"`
-	Created   time.Time `json:"time"`
-	Event     interface{}
+	ID            string    `json:"id"`
+	CorrelationID string    `json:"correlationID"`
+	SourceID      string    `json:"sourceID"`
+	Version       int       `json:"version"`
+	EventType     string    `json:"eventType"`
+	Created       time.Time `json:"time"`
+	Event         interface{}
 }
 
 // ByCreated is an alias for sorting VersionedEvents by the create field

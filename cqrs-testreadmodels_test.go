@@ -3,6 +3,7 @@ package cqrs_test
 import (
 	"fmt"
 	"github.com/andrewwebber/cqrs"
+	"github.com/logrusorgru/golorize"
 	"log"
 )
 
@@ -46,7 +47,7 @@ func NewReadModelAccountsFromHistory(events []cqrs.VersionedEvent) (*ReadModelAc
 
 func (model *ReadModelAccounts) UpdateViewModel(events []cqrs.VersionedEvent) error {
 	for _, event := range events {
-		log.Println("Accounts Model received event : ", event.EventType)
+		log.Println(golorize.Magenta("Accounts Model received event : " + event.EventType))
 		switch event.Event.(type) {
 		default:
 		case AccountCreatedEvent:
@@ -69,6 +70,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountCreatedEvent(accountID s
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
 	if model.Accounts[accountID] == nil {
+		log.Println(golorize.Red("Could not find account with ID " + accountID))
 		return
 	}
 
@@ -77,6 +79,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID 
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
 	if model.Accounts[accountID] == nil {
+		log.Println(golorize.Red("Could not find account with ID " + accountID))
 		return
 	}
 
@@ -85,6 +88,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID s
 
 func (model *ReadModelAccounts) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
 	if model.Accounts[accountID] == nil {
+		log.Println(golorize.Red("Could not find account with ID " + accountID))
 		return
 	}
 
@@ -100,11 +104,11 @@ type User struct {
 }
 
 func (user *User) String() string {
-	return fmt.Sprintf("UserModel::User %s with Email Address %s and Password Hash %f", user.ID, user.EmailAddress, user.PasswordHash)
+	return fmt.Sprintf("UserModel::User %s with Email Address %s and Password Hash %v", user.ID, user.EmailAddress, user.PasswordHash)
 }
 
 type UsersModel struct {
-	Users    map[string]*User
+	Users map[string]*User
 }
 
 func (model *UsersModel) String() string {
