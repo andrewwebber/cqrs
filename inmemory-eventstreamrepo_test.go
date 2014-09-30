@@ -23,7 +23,7 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example", hashedPassword, 0.0)
 	account.SetID(accountID)
 	account.ChangePassword("$ThisIsANOTHERPassword")
-	if err := repository.Save(account); err != nil {
+	if err := repository.Save(account, ""); err != nil {
 		t.Fatal(err)
 	}
 

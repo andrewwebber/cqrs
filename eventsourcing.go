@@ -11,7 +11,7 @@ import (
 // EventSourcingRepository is a repository for event source based aggregates
 type EventSourcingRepository interface {
 	TypeRegistry
-	Save(EventSourced) error
+	Save(EventSourced, string) error
 	Get(string, EventSourced) error
 }
 
@@ -37,8 +37,12 @@ func NewRepositoryWithPublisher(eventStreamRepository EventStreamRepository, pub
 	return defaultEventSourcingRepository{newTypeRegistry(), eventStreamRepository, publisher}
 }
 
-func (r defaultEventSourcingRepository) Save(source EventSourced) error {
+func (r defaultEventSourcingRepository) Save(source EventSourced, correlationID string) error {
 	id := source.ID()
+	if len(correlationID) == 0 {
+		correlationID = uuid.New()
+	}
+
 	currentVersion := source.Version() + 1
 	latestVersion := 0
 	var events []VersionedEvent
@@ -46,12 +50,13 @@ func (r defaultEventSourcingRepository) Save(source EventSourced) error {
 		eventType := reflect.TypeOf(event)
 		latestVersion = currentVersion + i
 		versionedEvent := VersionedEvent{
-			ID:        uuid.New(),
-			SourceID:  id,
-			Version:   latestVersion,
-			EventType: eventType.String(),
-			Created:   time.Now(),
-			Event:     event}
+			ID:            uuid.New(),
+			CorrelationID: correlationID,
+			SourceID:      id,
+			Version:       latestVersion,
+			EventType:     eventType.String(),
+			Created:       time.Now(),
+			Event:         event}
 
 		events = append(events, versionedEvent)
 	}

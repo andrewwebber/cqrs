@@ -157,7 +157,7 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 		account.SetID(accountID)
 		log.Println(account)
 		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account)
+		repository.Save(account, "")
 		log.Println(golorize.Green(account.String()))
 		return nil
 	})
@@ -172,7 +172,7 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 
 		account.ChangeEmailAddress(changeEmailAddressCommand.NewEmailAddress)
 		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account)
+		repository.Save(account, "")
 		log.Println(golorize.Green(account.String()))
 		return nil
 	})
@@ -187,7 +187,7 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 
 		account.ChangePassword(changePasswordCommand.NewPassword)
 		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account)
+		repository.Save(account, "")
 		log.Println(golorize.Green(account.String()))
 		return nil
 	})
@@ -202,7 +202,7 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 
 		account.Credit(creditAccountCommand.Amount)
 		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account)
+		repository.Save(account, "")
 		log.Println(golorize.Green(account.String()))
 		return nil
 	})
@@ -220,7 +220,7 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 		}
 
 		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account)
+		repository.Save(account, "")
 		log.Println(golorize.Green(account.String()))
 		return nil
 	})

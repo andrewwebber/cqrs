@@ -1,4 +1,4 @@
-package infrastructureexample_test
+package example
 
 import (
 	"encoding/json"

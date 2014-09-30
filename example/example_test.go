@@ -1,4 +1,4 @@
-package infrastructureexample_test
+package example
 
 import (
 	"code.google.com/p/go.crypto/bcrypt"
@@ -306,7 +306,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	log.Println(readModel)
 
 	log.Println("Persist the account")
-	repository.Save(account)
+	repository.Save(account, "")
 	log.Println(readModel)
 	log.Println(usersModel)
 
@@ -328,7 +328,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	log.Println(readModel)
 
 	log.Println("Persist the account")
-	repository.Save(account)
+	repository.Save(account, "")
 	log.Println(readModel)
 	log.Println(usersModel)
 
