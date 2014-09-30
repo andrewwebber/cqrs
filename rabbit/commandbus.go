@@ -51,7 +51,7 @@ func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 	// are the same.  This is part of AMQP being a programmable messaging model.
 	//
 	// See the Channel.Consume example for the complimentary declare.
-	err = c.ExchangeDeclare(bus.exchange, "fanout", true, false, false, false, nil)
+	err = c.ExchangeDeclare(bus.exchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("exchange.declare: %v", err)
 	}
@@ -72,7 +72,7 @@ func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 			Body:            encodedCommand,
 		}
 
-		err = c.Publish(bus.exchange, "", true, false, msg)
+		err = c.Publish(bus.exchange, bus.name, true, false, msg)
 		if err != nil {
 			// Since publish is asynchronous this can happen if the network connection
 			// is reset or if the server has run out of resources.
@@ -156,7 +156,7 @@ func (bus *CommandBus) consumeCommandsQueue() (*amqp.Connection, *amqp.Channel, 
 	// are the same.  This is part of AMQP being a programmable messaging model.
 	//
 	// See the Channel.Consume example for the complimentary declare.
-	err = c.ExchangeDeclare(bus.exchange, "fanout", true, false, false, false, nil)
+	err = c.ExchangeDeclare(bus.exchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("exchange.declare: %v", err)
 	}
