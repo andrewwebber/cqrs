@@ -10,13 +10,13 @@ var methodHandlerPrefix = "Handle"
 // HandlersCache is a map of types to functions that will be used to route event sourcing events
 type HandlersCache map[reflect.Type]func(source interface{}, event interface{})
 
-// EventTypeCache is a map of strings to reflect.Type structures
-type EventTypeCache map[string]reflect.Type
+// TypeCache is a map of strings to reflect.Type structures
+type TypeCache map[string]reflect.Type
 
 // TypeRegistry providers a helper registry for mapping event types and handlers after performance json serializaton
 type TypeRegistry interface {
 	GetHandlers(interface{}) HandlersCache
-	GetEventType(string) (reflect.Type, bool)
+	GetTypeByName(string) (reflect.Type, bool)
 	RegisterAggregate(aggregate interface{}, events ...interface{})
 	RegisterEvents(events ...interface{})
 	RegisterType(interface{})
@@ -24,7 +24,7 @@ type TypeRegistry interface {
 
 type defaultTypeRegistry struct {
 	HandlersDirectory map[reflect.Type]HandlersCache
-	EventTypes        EventTypeCache
+	Types             TypeCache
 }
 
 var cachedRegistry *defaultTypeRegistry
@@ -37,9 +37,9 @@ func NewTypeRegistry() TypeRegistry {
 func newTypeRegistry() *defaultTypeRegistry {
 	if cachedRegistry == nil {
 		handlersDirectory := make(map[reflect.Type]HandlersCache, 0)
-		eventTypes := make(EventTypeCache, 0)
+		types := make(TypeCache, 0)
 
-		cachedRegistry = &defaultTypeRegistry{handlersDirectory, eventTypes}
+		cachedRegistry = &defaultTypeRegistry{handlersDirectory, types}
 	}
 
 	return cachedRegistry
@@ -59,9 +59,9 @@ func (r *defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	return handlers
 }
 
-func (r *defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool) {
-	if eventTypeValue, ok := r.EventTypes[eventType]; ok {
-		return eventTypeValue, ok
+func (r *defaultTypeRegistry) GetTypeByName(typeName string) (reflect.Type, bool) {
+	if typeValue, ok := r.Types[typeName]; ok {
+		return typeValue, ok
 	}
 
 	return nil, false
@@ -69,7 +69,7 @@ func (r *defaultTypeRegistry) GetEventType(eventType string) (reflect.Type, bool
 
 func (r *defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
-	r.EventTypes[rawType.String()] = rawType
+	r.Types[rawType.String()] = rawType
 }
 
 func (r *defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {

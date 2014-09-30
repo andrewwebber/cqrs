@@ -13,12 +13,12 @@ func NewInMemoryCommandBus() *InMemoryCommandBus {
 }
 
 // PublishCommands publishes Commands to the Command bus
-func (bus *InMemoryCommandBus) PublishCommands(Commands []Command) error {
+func (bus *InMemoryCommandBus) PublishCommands(commands []Command) error {
 	if !bus.startReceiving {
 		return nil
 	}
 
-	for _, command := range Commands {
+	for _, command := range commands {
 		bus.publishedCommandsChannel <- command
 	}
 

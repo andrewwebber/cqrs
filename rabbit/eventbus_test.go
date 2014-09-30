@@ -16,7 +16,7 @@ type SampleEvent struct {
 // Simple test for publishing and received versioned events using rabbitmq
 func TestEventBus(t *testing.T) {
 	// Create a new event bus
-	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "rabbit_test", "testing.events")
+	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "rabbit_testevents", "testing.events")
 
 	// Register types
 	eventType := reflect.TypeOf(SampleEvent{})

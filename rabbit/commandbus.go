@@ -11,27 +11,26 @@ import (
 	"time"
 )
 
-type RawVersionedEvent struct {
-	ID            string    `json:"id"`
+// RawCommand represents an actor intention to alter the state of the system
+type RawCommand struct {
+	MessageID     string    `json:"messageID"`
 	CorrelationID string    `json:"correlationID"`
-	SourceID      string    `json:"sourceID"`
-	Version       int       `json:"version"`
-	EventType     string    `json:"eventType"`
+	CommandType   string    `json:"commandType"`
 	Created       time.Time `json:"time"`
-	Event         json.RawMessage
+	Body          json.RawMessage
 }
 
-type EventBus struct {
+type CommandBus struct {
 	connectionString string
 	name             string
 	exchange         string
 }
 
-func NewEventBus(connectionString string, name string, exchange string) *EventBus {
-	return &EventBus{connectionString, name, exchange}
+func NewCommandBus(connectionString string, name string, exchange string) *CommandBus {
+	return &CommandBus{connectionString, name, exchange}
 }
 
-func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
+func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
 	if err != nil {
@@ -57,8 +56,8 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 		return fmt.Errorf("exchange.declare: %v", err)
 	}
 
-	for _, event := range events {
-		encodedEvent, err := json.Marshal(event)
+	for _, command := range commands {
+		encodedCommand, err := json.Marshal(command)
 		if err != nil {
 			return fmt.Errorf("json.Marshal: %v", err)
 		}
@@ -70,7 +69,7 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 			Timestamp:       time.Now(),
 			ContentEncoding: "UTF-8",
 			ContentType:     "text/plain",
-			Body:            encodedEvent,
+			Body:            encodedCommand,
 		}
 
 		err = c.Publish(bus.exchange, "", true, false, msg)
@@ -84,8 +83,8 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 	return nil
 }
 
-func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) error {
-	conn, c, events, err := bus.consumeEventsQueue()
+func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) error {
+	conn, c, commands, err := bus.consumeCommandsQueue()
 	if err != nil {
 		return err
 	}
@@ -99,33 +98,31 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 					ch <- err
 				}
 
-			case message, more := <-events:
+			case message, more := <-commands:
 				if more {
-					var raw RawVersionedEvent
+					var raw RawCommand
 					if err := json.Unmarshal(message.Body, &raw); err != nil {
-						options.Error <- fmt.Errorf("json.Unmarshal received event: %v", err)
+						options.Error <- fmt.Errorf("json.Unmarshal received command: %v", err)
 					} else {
-						eventType, ok := options.TypeRegistry.GetEventType(raw.EventType)
+						commandType, ok := options.TypeRegistry.GetTypeByName(raw.CommandType)
 						if !ok {
-							log.Println("EventBus.Cannot find event type", raw.EventType)
-							options.Error <- errors.New("Cannot find event type " + raw.EventType)
+							log.Println("CommandBus.Cannot find command type", raw.CommandType)
+							options.Error <- errors.New("Cannot find command type " + raw.CommandType)
 						} else {
-							eventValue := reflect.New(eventType)
-							event := eventValue.Interface()
-							if err := json.Unmarshal(raw.Event, event); err != nil {
-								options.Error <- errors.New("Error deserializing event " + raw.EventType)
+							commandValue := reflect.New(commandType)
+							commandBody := commandValue.Interface()
+							if err := json.Unmarshal(raw.Body, commandBody); err != nil {
+								options.Error <- errors.New("Error deserializing command " + raw.CommandType)
 							} else {
-								versionedEvent := cqrs.VersionedEvent{
-									ID:            raw.ID,
+								command := cqrs.Command{
+									MessageID:     raw.MessageID,
 									CorrelationID: raw.CorrelationID,
-									SourceID:      raw.SourceID,
-									Version:       raw.Version,
-									EventType:     raw.EventType,
+									CommandType:   raw.CommandType,
 									Created:       raw.Created,
-									Event:         reflect.Indirect(eventValue).Interface()}
+									Body:          reflect.Indirect(commandValue).Interface()}
 								ackCh := make(chan bool)
-								log.Println("EventBus.Dispatching Message")
-								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
+								log.Println("CommandBus.Dispatching Message")
+								options.ReceiveCommand <- cqrs.CommandTransactedAccept{command, ackCh}
 								result := <-ackCh
 								message.Ack(result)
 							}
@@ -134,7 +131,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 				} else {
 					// Could have been disconnected
 					log.Println("Stopped listening for messages")
-					conn, c, events, err = bus.consumeEventsQueue()
+					conn, c, commands, err = bus.consumeCommandsQueue()
 				}
 			}
 		}
@@ -143,7 +140,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 	return nil
 }
 
-func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+func (bus *CommandBus) consumeCommandsQueue() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
 	if err != nil {
@@ -172,7 +169,7 @@ func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-ch
 		return nil, nil, nil, fmt.Errorf("queue.bind: %v", err)
 	}
 
-	events, err := c.Consume(bus.name, bus.name, false, true, false, false, nil)
+	commands, err := c.Consume(bus.name, bus.name, false, true, false, false, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
 	}
@@ -181,5 +178,5 @@ func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-ch
 		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
 	}
 
-	return conn, c, events, nil
+	return conn, c, commands, nil
 }
