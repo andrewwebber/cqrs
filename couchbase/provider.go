@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/andrewwebber/cqrs"
-	"github.com/couchbaselabs/go-couchbase"
 	"log"
 	"reflect"
 	"sort"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/couchbaselabs/go-couchbase"
 )
 
 type cbVersionedEvent struct {
@@ -123,7 +124,7 @@ func (r *EventStreamRepository) Get(id string) ([]cqrs.VersionedEvent, error) {
 
 		typeRegistry := cqrs.NewTypeRegistry()
 
-		eventType, ok := typeRegistry.GetEventType(raw.EventType)
+		eventType, ok := typeRegistry.GetTypeByName(raw.EventType)
 		if !ok {
 			log.Println("Cannot find event type", raw.EventType)
 			return nil, errors.New("Cannot find event type " + raw.EventType)
