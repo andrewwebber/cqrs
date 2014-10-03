@@ -11,11 +11,14 @@ import (
 var accountID = "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 func TestScenario(t *testing.T) {
+	// Type Registry
+	typeRegistry := cqrs.NewTypeRegistry()
+
 	// Event sourcing
 	persistance := cqrs.NewInMemoryEventStreamRepository()
 	bus := cqrs.NewInMemoryEventBus()
-	repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
-	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
+	repository := cqrs.NewRepositoryWithPublisher(persistance, bus, typeRegistry)
+	typeRegistry.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
 
 	// Read Models
 	readModel := NewReadModelAccounts()
@@ -23,11 +26,11 @@ func TestScenario(t *testing.T) {
 
 	// Command Handlers
 	commandBus := cqrs.NewInMemoryCommandBus()
-	commandDispatcher := cqrs.NewCommandDispatchManager(commandBus)
+	commandDispatcher := cqrs.NewCommandDispatchManager(commandBus, typeRegistry)
 	RegisterCommandHandlers(commandDispatcher, repository)
 
 	// Integration events
-	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
+	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus, typeRegistry)
 	integrationEventsLog := cqrs.NewInMemoryEventStreamRepository()
 	RegisterIntegrationEventHandlers(eventDispatcher, integrationEventsLog, readModel, usersModel)
 

@@ -7,8 +7,9 @@ import (
 )
 
 func TestInMemoryEventStreamRepository(t *testing.T) {
+	typeRegistry := cqrs.NewTypeRegistry()
 	persistance := cqrs.NewInMemoryEventStreamRepository()
-	repository := cqrs.NewRepository(persistance)
+	repository := cqrs.NewRepository(persistance, typeRegistry)
 
 	hashedPassword, err := GetHashForPassword("$ThisIsMyPassword1")
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"

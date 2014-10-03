@@ -35,7 +35,7 @@ type CommandReceiver interface {
 // CommandDispatchManager is responsible for coordinating receiving messages from command receivers and dispatching them to the command dispatcher.
 type CommandDispatchManager struct {
 	commandDispatcher *MapBasedCommandDispatcher
-	typeRegistry      *defaultTypeRegistry
+	typeRegistry      TypeRegistry
 	receiver          CommandReceiver
 }
 
@@ -113,8 +113,7 @@ func (m *MapBasedCommandDispatcher) DispatchCommand(command Command) error {
 }
 
 // NewCommandDispatchManager is a constructor for the CommandDispatchManager
-func NewCommandDispatchManager(receiver CommandReceiver) *CommandDispatchManager {
-	registry := newTypeRegistry()
+func NewCommandDispatchManager(receiver CommandReceiver, registry TypeRegistry) *CommandDispatchManager {
 	return &CommandDispatchManager{NewMapBasedCommandDispatcher(), registry, receiver}
 }
 
@@ -160,9 +159,10 @@ func (m *CommandDispatchManager) Listen(stop <-chan bool) error {
 			command.ProcessedSuccessfully <- true
 			log.Println("CommandDispatchManager.DispatchSuccessful")
 		case <-stop:
-			log.Println("CommandDispatchManager.Stopped")
+			log.Println("CommandDispatchManager.Stopping")
 			closeSignal := make(chan error)
 			closeChannel <- closeSignal
+			defer log.Println("CommandDispatchManager.Stopped")
 			return <-closeSignal
 		// Receiving on this channel signifys an error has occured worker processor side
 		case err := <-errorChannel:

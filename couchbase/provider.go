@@ -29,20 +29,20 @@ type EventStreamRepository struct {
 }
 
 // NewEventStreamRepository creates new Couchbase Server based event stream repository
-func NewEventStreamRepository(connectionString string) (*EventStreamRepository, error) {
+func NewEventStreamRepository(connectionString string, poolName string, bucketName string) (*EventStreamRepository, error) {
 	c, err := couchbase.Connect(connectionString)
 	if err != nil {
 		log.Println(fmt.Sprintf("Error connecting to couchbase : %v", err))
 		return nil, err
 	}
 
-	pool, err := c.GetPool("default")
+	pool, err := c.GetPool(poolName)
 	if err != nil {
 		log.Println(fmt.Sprintf("Error getting pool:  %v", err))
 		return nil, err
 	}
 
-	bucket, err := pool.GetBucket("cqrs")
+	bucket, err := pool.GetBucket(bucketName)
 	if err != nil {
 		log.Println(fmt.Sprintf("Error getting bucket:  %v", err))
 		return nil, err

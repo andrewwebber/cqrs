@@ -43,7 +43,7 @@ type VersionedEventReceiver interface {
 // VersionedEventDispatchManager is responsible for coordinating receiving messages from event receivers and dispatching them to the event dispatcher.
 type VersionedEventDispatchManager struct {
 	versionedEventDispatcher *MapBasedVersionedEventDispatcher
-	typeRegistry             *defaultTypeRegistry
+	typeRegistry             TypeRegistry
 	receiver                 VersionedEventReceiver
 }
 
@@ -121,8 +121,7 @@ func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) e
 }
 
 // NewVersionedEventDispatchManager is a constructor for the VersionedEventDispatchManager
-func NewVersionedEventDispatchManager(receiver VersionedEventReceiver) *VersionedEventDispatchManager {
-	registry := newTypeRegistry()
+func NewVersionedEventDispatchManager(receiver VersionedEventReceiver, registry TypeRegistry) *VersionedEventDispatchManager {
 	return &VersionedEventDispatchManager{NewVersionedEventDispatcher(), registry, receiver}
 }
 
@@ -168,9 +167,10 @@ func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
 			event.ProcessedSuccessfully <- true
 			log.Println("EventDispatchManager.DispatchSuccessful")
 		case <-stop:
-			log.Println("EventDispatchManager.Stopped")
+			log.Println("EventDispatchManager.Stopping")
 			closeSignal := make(chan error)
 			closeChannel <- closeSignal
+			defer log.Println("EventDispatchManager.Stopped")
 			return <-closeSignal
 		// Receiving on this channel signifys an error has occured worker processor side
 		case err := <-errorChannel:

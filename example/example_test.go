@@ -190,7 +190,7 @@ func (account *Account) HandleAccountDebitedEvent(event AccountDebitedEvent) {
 // }
 
 func TestEventSourcingWithCouchbase(t *testing.T) {
-	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/")
+	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/", "default", "cqrs")
 	if error != nil {
 		t.Fatal(error)
 	}
@@ -199,16 +199,18 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 }
 
 func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrationEvents cqrs.VersionedEventPublicationLogger) {
+	typeRegistry := cqrs.NewTypeRegistry()
 	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "example_test", "testing.example")
-	repository := cqrs.NewRepositoryWithPublisher(persistance, bus)
-	repository.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
+	repository := cqrs.NewRepositoryWithPublisher(persistance, bus, typeRegistry)
+	repository.GetTypeRegistry().RegisterAggregate(&Account{})
+	repository.GetTypeRegistry().RegisterEvents(AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
 	accountID := "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 	readModel := NewReadModelAccounts()
 
 	usersModel := NewUsersModel()
 
-	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus)
+	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus, typeRegistry)
 	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
 		integrationEvents.SaveIntegrationEvent(event)
 		return nil

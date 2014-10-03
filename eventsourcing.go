@@ -10,7 +10,7 @@ import (
 
 // EventSourcingRepository is a repository for event source based aggregates
 type EventSourcingRepository interface {
-	TypeRegistry
+	GetTypeRegistry() TypeRegistry
 	Save(EventSourced, string) error
 	Get(string, EventSourced) error
 }
@@ -22,19 +22,23 @@ type EventStreamRepository interface {
 }
 
 type defaultEventSourcingRepository struct {
-	*defaultTypeRegistry
+	Registry        TypeRegistry
 	EventRepository EventStreamRepository
 	Publisher       VersionedEventPublisher
 }
 
 // NewRepository constructs an EventSourcingRepository
-func NewRepository(eventStreamRepository EventStreamRepository) EventSourcingRepository {
-	return NewRepositoryWithPublisher(eventStreamRepository, nil)
+func NewRepository(eventStreamRepository EventStreamRepository, registry TypeRegistry) EventSourcingRepository {
+	return NewRepositoryWithPublisher(eventStreamRepository, nil, registry)
 }
 
 // NewRepositoryWithPublisher constructs an EventSourcingRepository with a VersionedEventPublisher to dispatch events once persisted to the EventStreamRepository
-func NewRepositoryWithPublisher(eventStreamRepository EventStreamRepository, publisher VersionedEventPublisher) EventSourcingRepository {
-	return defaultEventSourcingRepository{newTypeRegistry(), eventStreamRepository, publisher}
+func NewRepositoryWithPublisher(eventStreamRepository EventStreamRepository, publisher VersionedEventPublisher, registry TypeRegistry) EventSourcingRepository {
+	return defaultEventSourcingRepository{registry, eventStreamRepository, publisher}
+}
+
+func (r defaultEventSourcingRepository) GetTypeRegistry() TypeRegistry {
+	return r.Registry
 }
 
 func (r defaultEventSourcingRepository) Save(source EventSourced, correlationID string) error {
@@ -82,7 +86,7 @@ func (r defaultEventSourcingRepository) Get(id string, source EventSourced) erro
 		return error
 	}
 
-	handlers := r.GetHandlers(source)
+	handlers := r.Registry.GetHandlers(source)
 	for _, event := range events {
 		eventType := reflect.TypeOf(event.Event)
 		handler, ok := handlers[eventType]

@@ -95,9 +95,8 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 			select {
 			case ch := <-options.Close:
 				defer conn.Close()
-				if err = c.Cancel(bus.name, false); err != nil {
-					ch <- err
-				}
+				ch <- c.Cancel(bus.name, false)
+				return
 
 			case message, more := <-events:
 				if more {

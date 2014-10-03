@@ -1,6 +1,7 @@
 package cqrs
 
 import (
+	"log"
 	"reflect"
 	"strings"
 )
@@ -64,12 +65,19 @@ func (r *defaultTypeRegistry) GetTypeByName(typeName string) (reflect.Type, bool
 		return typeValue, ok
 	}
 
+	log.Println("Could not find type registration for type  - ", typeName)
+	log.Println("The registry looks as follows:")
+	for key := range r.Types {
+		log.Println(key)
+	}
+
 	return nil, false
 }
 
 func (r *defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
 	r.Types[rawType.String()] = rawType
+	log.Println("Type Registered - ", rawType.String())
 }
 
 func (r *defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {
