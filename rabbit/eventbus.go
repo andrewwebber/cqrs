@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/andrewwebber/cqrs"
-	"github.com/streadway/amqp"
 	"log"
 	"reflect"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/streadway/amqp"
 )
 
 type RawVersionedEvent struct {
@@ -107,7 +108,8 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 						eventType, ok := options.TypeRegistry.GetTypeByName(raw.EventType)
 						if !ok {
 							log.Println("EventBus.Cannot find event type", raw.EventType)
-							options.Error <- errors.New("Cannot find event type " + raw.EventType)
+							// options.Error <- errors.New("Cannot find event type " + raw.EventType)
+							message.Ack(true)
 						} else {
 							eventValue := reflect.New(eventType)
 							event := eventValue.Interface()
