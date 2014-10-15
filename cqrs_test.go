@@ -1,11 +1,12 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
-	"github.com/logrusorgru/golorize"
 	"log"
 	"testing"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/logrusorgru/golorize"
 )
 
 var accountID = "5058e029-d329-4c4b-b111-b042e48b0c5f"
@@ -105,7 +106,7 @@ func TestScenario(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 	log.Println("Dump history - integration events")
-	if history, err := integrationEventsLog.AllEventsEverPublished(); err != nil {
+	if history, err := integrationEventsLog.AllIntegrationEventsEverPublished(); err != nil {
 		t.Fatal(err)
 	} else {
 		for _, event := range history {

@@ -3,10 +3,11 @@ package example
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/andrewwebber/cqrs"
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 type AccountReadModel struct {
@@ -42,7 +43,7 @@ func (model *ReadModelAccounts) LoadAccounts(persistance cqrs.VersionedEventPubl
 		json.Unmarshal(readBytes, &model.Accounts)
 	} else {
 		log.Println("Replaying events from repository")
-		events, error := persistance.AllEventsEverPublished()
+		events, error := persistance.AllIntegrationEventsEverPublished()
 		if error == nil {
 			model.UpdateViewModel(events)
 		}

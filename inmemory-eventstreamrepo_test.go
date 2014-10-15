@@ -1,9 +1,10 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
 	"log"
 	"testing"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 func TestInMemoryEventStreamRepository(t *testing.T) {
@@ -37,7 +38,7 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 		t.Fatal("Expected PasswordHash to match")
 	}
 
-	if events, err := persistance.AllEventsEverPublished(); err != nil {
+	if events, err := persistance.AllIntegrationEventsEverPublished(); err != nil {
 		t.Fatal(err)
 	} else {
 		log.Println(events)

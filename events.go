@@ -27,7 +27,7 @@ func (c ByCreated) Less(i, j int) bool { return c[i].Created.Before(c[j].Created
 // VersionedEventPublicationLogger is responsible to retreiving all events ever published to facilitate readmodel reconstruction
 type VersionedEventPublicationLogger interface {
 	SaveIntegrationEvent(VersionedEvent) error
-	AllEventsEverPublished() ([]VersionedEvent, error)
+	AllIntegrationEventsEverPublished() ([]VersionedEvent, error)
 }
 
 // VersionedEventPublisher is responsible for publishing events that have been saved to the event store\repository

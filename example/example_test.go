@@ -1,9 +1,10 @@
 package example
 
 import (
-	"code.google.com/p/go.crypto/bcrypt"
 	"errors"
 	"fmt"
+
+	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rabbit"
@@ -190,7 +191,7 @@ func (account *Account) HandleAccountDebitedEvent(event AccountDebitedEvent) {
 // }
 
 func TestEventSourcingWithCouchbase(t *testing.T) {
-	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/", "default", "cqrs")
+	persistance, error := couchbase.NewEventStreamRepository("http://localhost:8091/", "default", "cqrs", "example")
 	if error != nil {
 		t.Fatal(error)
 	}
