@@ -1,10 +1,11 @@
 package cqrs
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"log"
 	"reflect"
 	"time"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 // Command represents an actor intention to alter the state of the system
@@ -20,6 +21,12 @@ type Command struct {
 func CreateCommand(body interface{}) Command {
 	commandType := reflect.TypeOf(body)
 	return Command{uuid.New(), uuid.New(), commandType.String(), time.Now(), body}
+}
+
+// CreateCommandWithCorrelationID is a helper for creating a new command object with populated default properties
+func CreateCommandWithCorrelationID(body interface{}, correlationID string) Command {
+	commandType := reflect.TypeOf(body)
+	return Command{uuid.New(), correlationID, commandType.String(), time.Now(), body}
 }
 
 // CommandPublisher is responsilbe for publishing commands

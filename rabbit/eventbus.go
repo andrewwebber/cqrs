@@ -144,6 +144,22 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 	return nil
 }
 
+func (bus *EventBus) DeleteQueue(name string) error {
+	// Connects opens an AMQP connection from the credentials in the URL.
+	conn, err := amqp.Dial(bus.connectionString)
+	if err != nil {
+		return fmt.Errorf("connection.open: %s", err)
+	}
+
+	c, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("channel.open: %s", err)
+	}
+
+	_, err = c.QueueDelete(name, false, false, true)
+	return err
+}
+
 func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
