@@ -1,5 +1,7 @@
 CQRS framework in go
 =======
+
+[![Join the chat at https://gitter.im/andrewwebber/cqrs](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/andrewwebber/cqrs?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![GoDoc](https://godoc.org/github.com/andrewwebber/cqrs?status.svg)](https://godoc.org/github.com/andrewwebber/cqrs)
 [![Build Status](https://drone.io/github.com/andrewwebber/cqrs/status.png?foo=bar)](https://drone.io/github.com/andrewwebber/cqrs/latest)
 
