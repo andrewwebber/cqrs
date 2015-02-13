@@ -162,7 +162,6 @@ func (m *CommandDispatchManager) Listen(stop <-chan bool) error {
 			if err := m.commandDispatcher.DispatchCommand(command.Command); err != nil {
 				log.Println("Error dispatching command: ", err)
 				command.ProcessedSuccessfully <- false
-				panic(err)
 			} else {
 				command.ProcessedSuccessfully <- true
 				log.Println("CommandDispatchManager.DispatchSuccessful")

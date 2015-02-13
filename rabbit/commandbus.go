@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/andrewwebber/cqrs"
-	"github.com/streadway/amqp"
 	"log"
 	"reflect"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/streadway/amqp"
 )
 
 // RawCommand represents an actor intention to alter the state of the system
@@ -123,7 +124,11 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 								log.Println("CommandBus.Dispatching Message")
 								options.ReceiveCommand <- cqrs.CommandTransactedAccept{command, ackCh}
 								result := <-ackCh
-								message.Ack(result)
+								if result {
+									message.Ack(result)
+								} else {
+									message.Reject(true)
+								}
 							}
 						}
 					}
