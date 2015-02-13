@@ -161,10 +161,12 @@ func (m *CommandDispatchManager) Listen(stop <-chan bool) error {
 			log.Println("CommandDispatchManager.DispatchCommand: ", command.Command)
 			if err := m.commandDispatcher.DispatchCommand(command.Command); err != nil {
 				log.Println("Error dispatching command: ", err)
+				command.ProcessedSuccessfully <- false
+				panic(err)
+			} else {
+				command.ProcessedSuccessfully <- true
+				log.Println("CommandDispatchManager.DispatchSuccessful")
 			}
-
-			command.ProcessedSuccessfully <- true
-			log.Println("CommandDispatchManager.DispatchSuccessful")
 		case <-stop:
 			log.Println("CommandDispatchManager.Stopping")
 			closeSignal := make(chan error)
