@@ -2,9 +2,10 @@ package cqrs_test
 
 import (
 	"fmt"
-	"github.com/andrewwebber/cqrs"
-	"github.com/logrusorgru/golorize"
 	"log"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/logrusorgru/glr"
 )
 
 type AccountReadModel struct {
@@ -47,7 +48,7 @@ func NewReadModelAccountsFromHistory(events []cqrs.VersionedEvent) (*ReadModelAc
 
 func (model *ReadModelAccounts) UpdateViewModel(events []cqrs.VersionedEvent) error {
 	for _, event := range events {
-		log.Println(golorize.Magenta("Accounts Model received event : " + event.EventType))
+		log.Println(glr.Magenta("Accounts Model received event : " + event.EventType))
 		switch event.Event.(type) {
 		default:
 			return nil
@@ -71,7 +72,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountCreatedEvent(accountID s
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID string, event AccountCreditedEvent) {
 	if model.Accounts[accountID] == nil {
-		log.Println(golorize.Red("Could not find account with ID " + accountID))
+		log.Println(glr.Red("Could not find account with ID " + accountID))
 		return
 	}
 
@@ -80,7 +81,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountCreditedEvent(accountID 
 
 func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID string, event AccountDebitedEvent) {
 	if model.Accounts[accountID] == nil {
-		log.Println(golorize.Red("Could not find account with ID " + accountID))
+		log.Println(glr.Red("Could not find account with ID " + accountID))
 		return
 	}
 
@@ -89,7 +90,7 @@ func (model *ReadModelAccounts) UpdateViewModelOnAccountDebitedEvent(accountID s
 
 func (model *ReadModelAccounts) UpdateViewModelOnEmailAddressChangedEvent(accountID string, event EmailAddressChangedEvent) {
 	if model.Accounts[accountID] == nil {
-		log.Println(golorize.Red("Could not find account with ID " + accountID))
+		log.Println(glr.Red("Could not find account with ID " + accountID))
 		return
 	}
 

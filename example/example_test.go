@@ -309,7 +309,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	log.Println(readModel)
 
 	log.Println("Persist the account")
-	repository.Save(account, "")
+	repository.Save(account, "correlationID")
 	log.Println(readModel)
 	log.Println(usersModel)
 
@@ -351,4 +351,18 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	}
 
 	stopChannel <- true
+
+	log.Println("GetIntegrationEventsByCorrelationID")
+	correlationEvents, err := integrationEvents.GetIntegrationEventsByCorrelationID("correlationID")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(correlationEvents) == 0 {
+		t.Fatal("Expected correlation events")
+	}
+
+	for _, correlationEvent := range correlationEvents {
+		log.Println(correlationEvent)
+	}
 }

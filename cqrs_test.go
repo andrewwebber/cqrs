@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/andrewwebber/cqrs"
-	"github.com/logrusorgru/golorize"
+	"github.com/logrusorgru/glr"
 )
 
 var accountID = "5058e029-d329-4c4b-b111-b042e48b0c5f"
 
 func TestScenario(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	// Type Registry
 	typeRegistry := cqrs.NewTypeRegistry()
 
@@ -114,6 +115,16 @@ func TestScenario(t *testing.T) {
 		}
 	}
 
+	log.Println("GetIntegrationEventsByCorrelationID")
+	correlationEvents, err := integrationEventsLog.GetIntegrationEventsByCorrelationID(debitAccountCommand.CorrelationID)
+	if err != nil || len(correlationEvents) == 0 {
+		t.Fatal(err)
+	}
+
+	for correlationEvent := range correlationEvents {
+		log.Println(correlationEvent)
+	}
+
 	log.Println("Load the account from history")
 	account, error := NewAccountFromHistory(accountID, repository)
 	if error != nil {
@@ -150,70 +161,70 @@ func RegisterIntegrationEventHandlers(eventDispatcher *cqrs.VersionedEventDispat
 func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, repository cqrs.EventSourcingRepository) {
 	commandDispatcher.RegisterCommandHandler(CreateAccountCommand{}, func(command cqrs.Command) error {
 		createAccountCommand := command.Body.(CreateAccountCommand)
-		log.Println(golorize.Green("Processing command - Create account"))
+		log.Println(glr.Green("Processing command - Create account"))
 		account := NewAccount(createAccountCommand.FirstName,
 			createAccountCommand.LastName,
 			createAccountCommand.EmailAddress,
 			createAccountCommand.PasswordHash,
 			createAccountCommand.InitialBalance)
 
-		log.Println(golorize.Green("Set ID..."))
+		log.Println(glr.Green("Set ID..."))
 		account.SetID(accountID)
 		log.Println(account)
-		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account, "")
-		log.Println(golorize.Green(account.String()))
+		log.Println(glr.Green("Persist the account"))
+		repository.Save(account, command.CorrelationID)
+		log.Println(glr.Green(account.String()))
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(ChangeEmailAddressCommand{}, func(command cqrs.Command) error {
 		changeEmailAddressCommand := command.Body.(ChangeEmailAddressCommand)
-		log.Println(golorize.Green("Processing command - Change email address"))
+		log.Println(glr.Green("Processing command - Change email address"))
 		account, err := NewAccountFromHistory(changeEmailAddressCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
 		account.ChangeEmailAddress(changeEmailAddressCommand.NewEmailAddress)
-		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account, "")
-		log.Println(golorize.Green(account.String()))
+		log.Println(glr.Green("Persist the account"))
+		repository.Save(account, command.CorrelationID)
+		log.Println(glr.Green(account.String()))
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(ChangePasswordCommand{}, func(command cqrs.Command) error {
 		changePasswordCommand := command.Body.(ChangePasswordCommand)
-		log.Println(golorize.Green("Processing command - Change password"))
+		log.Println(glr.Green("Processing command - Change password"))
 		account, err := NewAccountFromHistory(changePasswordCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
 		account.ChangePassword(changePasswordCommand.NewPassword)
-		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account, "")
-		log.Println(golorize.Green(account.String()))
+		log.Println(glr.Green("Persist the account"))
+		repository.Save(account, command.CorrelationID)
+		log.Println(glr.Green(account.String()))
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(CreditAccountCommand{}, func(command cqrs.Command) error {
 		creditAccountCommand := command.Body.(CreditAccountCommand)
-		log.Println(golorize.Green("Processing command - Credit account"))
+		log.Println(glr.Green("Processing command - Credit account"))
 		account, err := NewAccountFromHistory(creditAccountCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
 		account.Credit(creditAccountCommand.Amount)
-		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account, "")
-		log.Println(golorize.Green(account.String()))
+		log.Println(glr.Green("Persist the account"))
+		repository.Save(account, command.CorrelationID)
+		log.Println(glr.Green(account.String()))
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(DebitAccountCommand{}, func(command cqrs.Command) error {
 		debitAccountCommand := command.Body.(DebitAccountCommand)
-		log.Println(golorize.Green("Processing command - Debit account"))
+		log.Println(glr.Green("Processing command - Debit account"))
 		account, err := NewAccountFromHistory(debitAccountCommand.AccountID, repository)
 		if err != nil {
 			return err
@@ -223,9 +234,9 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 			return err
 		}
 
-		log.Println(golorize.Green("Persist the account"))
-		repository.Save(account, "")
-		log.Println(golorize.Green(account.String()))
+		log.Println(glr.Green("Persist the account"))
+		repository.Save(account, command.CorrelationID)
+		log.Println(glr.Green(account.String()))
 		return nil
 	})
 }

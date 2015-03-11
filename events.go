@@ -28,6 +28,7 @@ func (c ByCreated) Less(i, j int) bool { return c[i].Created.Before(c[j].Created
 type VersionedEventPublicationLogger interface {
 	SaveIntegrationEvent(VersionedEvent) error
 	AllIntegrationEventsEverPublished() ([]VersionedEvent, error)
+	GetIntegrationEventsByCorrelationID(correlationID string) ([]VersionedEvent, error)
 }
 
 // VersionedEventPublisher is responsible for publishing events that have been saved to the event store\repository

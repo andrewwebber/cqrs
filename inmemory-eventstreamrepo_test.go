@@ -25,7 +25,7 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example", hashedPassword, 0.0)
 	account.SetID(accountID)
 	account.ChangePassword("$ThisIsANOTHERPassword")
-	if err := repository.Save(account, ""); err != nil {
+	if err := repository.Save(account, "correlationID"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -42,5 +42,19 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		log.Println(events)
+	}
+
+	correlationEvents, err := persistance.GetIntegrationEventsByCorrelationID("correlationID")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(correlationEvents) == 0 {
+		t.Fatal("Expeced correlation events")
+	}
+
+	log.Println("GetIntegrationEventsByCorrelationID")
+	for _, correlationEvent := range correlationEvents {
+		log.Println(correlationEvent)
 	}
 }

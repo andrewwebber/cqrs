@@ -7,6 +7,7 @@ import (
 	"log"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/andrewwebber/cqrs"
@@ -57,8 +58,12 @@ func (r *EventStreamRepository) Save(sourceID string, events []cqrs.VersionedEve
 	latestVersion := events[len(events)-1].Version
 	for _, versionedEvent := range events {
 		key := fmt.Sprintf("%s:%s:%d", r.cbPrefix, sourceID, versionedEvent.Version)
-		if added, error := r.bucket.Add(key, 0, versionedEvent); error != nil || !added {
-			return error
+		if added, err := r.bucket.Add(key, 0, versionedEvent); err != nil || !added {
+			return err
+		}
+
+		if err := r.SaveIntegrationEvent(versionedEvent); err != nil {
+			return err
 		}
 	}
 
@@ -68,17 +73,48 @@ func (r *EventStreamRepository) Save(sourceID string, events []cqrs.VersionedEve
 
 // SaveIntegrationEvent persists a published integration event
 func (r *EventStreamRepository) SaveIntegrationEvent(event cqrs.VersionedEvent) error {
-	counter, err := r.bucket.Incr("integration", 1, 1, 0)
+	counter, err := r.bucket.Incr("eventstore:integration", 1, 1, 0)
 	if err != nil {
 		return err
 	}
 
-	key := fmt.Sprintf("integration::%d", counter)
+	key := fmt.Sprintf("eventstore:integration:%d", counter)
 	if err = r.bucket.Set(key, 0, event); err != nil {
 		return err
 	}
 
+	var eventsByCorrelationID map[string]cqrs.VersionedEvent
+	correlationKey := "eventstore:correlation:" + event.CorrelationID
+	if err := r.bucket.Get(correlationKey, &eventsByCorrelationID); err != nil {
+		if IsNotFoundError(err) {
+			eventsByCorrelationID = make(map[string]cqrs.VersionedEvent)
+		} else {
+			return err
+		}
+	}
+
+	eventsByCorrelationID[event.ID] = event
+
+	if err := r.bucket.Set(correlationKey, 0, eventsByCorrelationID); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (r *EventStreamRepository) GetIntegrationEventsByCorrelationID(correlationID string) ([]cqrs.VersionedEvent, error) {
+	var eventsByCorrelationID map[string]cqrs.VersionedEvent
+	correlationKey := "eventstore:correlation:" + correlationID
+	if err := r.bucket.Get(correlationKey, &eventsByCorrelationID); err != nil {
+		return nil, err
+	}
+
+	var events []cqrs.VersionedEvent
+	for _, v := range eventsByCorrelationID {
+		events = append(events, v)
+	}
+
+	return events, nil
 }
 
 // AllIntegrationEventsEverPublished retreives all events every persisted
@@ -152,4 +188,15 @@ func (r *EventStreamRepository) Get(id string) ([]cqrs.VersionedEvent, error) {
 	}
 
 	return events, nil
+}
+
+const NOT_FOUND string = "Not found"
+
+func IsNotFoundError(err error) bool {
+	// No error?
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(err.Error(), NOT_FOUND)
 }

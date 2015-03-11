@@ -1,11 +1,12 @@
 package cqrs
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"errors"
 	"log"
 	"reflect"
 	"time"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 // EventSourcingRepository is a repository for event source based aggregates
