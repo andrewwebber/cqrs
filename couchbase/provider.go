@@ -103,15 +103,37 @@ func (r *EventStreamRepository) SaveIntegrationEvent(event cqrs.VersionedEvent) 
 }
 
 func (r *EventStreamRepository) GetIntegrationEventsByCorrelationID(correlationID string) ([]cqrs.VersionedEvent, error) {
-	var eventsByCorrelationID map[string]cqrs.VersionedEvent
+	var eventsByCorrelationID map[string]cbVersionedEvent
 	correlationKey := "eventstore:correlation:" + correlationID
 	if err := r.bucket.Get(correlationKey, &eventsByCorrelationID); err != nil {
 		return nil, err
 	}
 
+	typeRegistry := cqrs.NewTypeRegistry()
 	var events []cqrs.VersionedEvent
-	for _, v := range eventsByCorrelationID {
-		events = append(events, v)
+	for _, raw := range eventsByCorrelationID {
+		eventType, ok := typeRegistry.GetTypeByName(raw.EventType)
+		if !ok {
+			log.Println("Cannot find event type", raw.EventType)
+			return nil, errors.New("Cannot find event type " + raw.EventType)
+		}
+
+		eventValue := reflect.New(eventType)
+		event := eventValue.Interface()
+		if err := json.Unmarshal(raw.Event, event); err != nil {
+			log.Println("Error deserializing event ", raw.Event)
+			return nil, err
+		}
+
+		versionedEvent := cqrs.VersionedEvent{
+			ID:        raw.ID,
+			SourceID:  raw.SourceID,
+			Version:   raw.Version,
+			EventType: raw.EventType,
+			Created:   raw.Created,
+			Event:     reflect.Indirect(eventValue).Interface()}
+
+		events = append(events, versionedEvent)
 	}
 
 	return events, nil

@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"code.google.com/p/go-uuid/uuid"
 	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rabbit"
+	"github.com/logrusorgru/glr"
 	// "github.com/andrewwebber/cqrs/rethinkdb"
 	// r "github.com/dancannon/gorethink"
 	"log"
@@ -196,10 +198,10 @@ func TestEventSourcingWithCouchbase(t *testing.T) {
 		t.Fatal(error)
 	}
 
-	RunScenario(t, persistance, persistance)
+	RunScenario(t, persistance)
 }
 
-func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrationEvents cqrs.VersionedEventPublicationLogger) {
+func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	typeRegistry := cqrs.NewTypeRegistry()
 	bus := rabbit.NewEventBus("amqp://guest:guest@localhost:5672/", "example_test", "testing.example")
 	repository := cqrs.NewRepositoryWithPublisher(persistance, bus, typeRegistry)
@@ -212,10 +214,6 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	usersModel := NewUsersModel()
 
 	eventDispatcher := cqrs.NewVersionedEventDispatchManager(bus, typeRegistry)
-	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
-		integrationEvents.SaveIntegrationEvent(event)
-		return nil
-	})
 
 	eventDispatcher.RegisterEventHandler(AccountCreatedEvent{}, func(event cqrs.VersionedEvent) error {
 		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
@@ -247,9 +245,10 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	stopChannel := make(chan bool)
 	go eventDispatcher.Listen(stopChannel)
 
-	readModel.LoadAccounts(integrationEvents)
+	testCorrelationID := uuid.New()
+	readModel.LoadAccounts(persistance)
 
-	usersModel.LoadUsers(integrationEvents)
+	usersModel.LoadUsers(persistance)
 
 	log.Println("Loaded accounts")
 	log.Println(readModel)
@@ -309,7 +308,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	log.Println(readModel)
 
 	log.Println("Persist the account")
-	repository.Save(account, "correlationID")
+	repository.Save(account, "")
 	log.Println(readModel)
 	log.Println(usersModel)
 
@@ -331,7 +330,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	log.Println(readModel)
 
 	log.Println("Persist the account")
-	repository.Save(account, "")
+	repository.Save(account, testCorrelationID)
 	log.Println(readModel)
 	log.Println(usersModel)
 
@@ -350,10 +349,11 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
 
+	log.Println("Stop channel")
 	stopChannel <- true
 
 	log.Println("GetIntegrationEventsByCorrelationID")
-	correlationEvents, err := integrationEvents.GetIntegrationEventsByCorrelationID("correlationID")
+	correlationEvents, err := persistance.GetIntegrationEventsByCorrelationID(testCorrelationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,6 +363,6 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository, integrati
 	}
 
 	for _, correlationEvent := range correlationEvents {
-		log.Println(correlationEvent)
+		log.Println(glr.Green(fmt.Sprintf("%v", correlationEvent.Event)))
 	}
 }

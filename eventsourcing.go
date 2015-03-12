@@ -11,6 +11,7 @@ import (
 
 // EventSourcingRepository is a repository for event source based aggregates
 type EventSourcingRepository interface {
+	GetEventStreamRepository() EventStreamRepository
 	GetTypeRegistry() TypeRegistry
 	Save(EventSourced, string) error
 	Get(string, EventSourced) error
@@ -18,6 +19,7 @@ type EventSourcingRepository interface {
 
 // EventStreamRepository is a persistance layer for events associated with aggregates by ID
 type EventStreamRepository interface {
+	VersionedEventPublicationLogger
 	Save(string, []VersionedEvent) error
 	Get(string) ([]VersionedEvent, error)
 }
@@ -36,6 +38,10 @@ func NewRepository(eventStreamRepository EventStreamRepository, registry TypeReg
 // NewRepositoryWithPublisher constructs an EventSourcingRepository with a VersionedEventPublisher to dispatch events once persisted to the EventStreamRepository
 func NewRepositoryWithPublisher(eventStreamRepository EventStreamRepository, publisher VersionedEventPublisher, registry TypeRegistry) EventSourcingRepository {
 	return defaultEventSourcingRepository{registry, eventStreamRepository, publisher}
+}
+
+func (r defaultEventSourcingRepository) GetEventStreamRepository() EventStreamRepository {
+	return r.EventRepository
 }
 
 func (r defaultEventSourcingRepository) GetTypeRegistry() TypeRegistry {

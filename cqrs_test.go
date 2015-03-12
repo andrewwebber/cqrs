@@ -107,7 +107,7 @@ func TestScenario(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond)
 	log.Println("Dump history - integration events")
-	if history, err := integrationEventsLog.AllIntegrationEventsEverPublished(); err != nil {
+	if history, err := repository.GetEventStreamRepository().AllIntegrationEventsEverPublished(); err != nil {
 		t.Fatal(err)
 	} else {
 		for _, event := range history {
@@ -116,7 +116,7 @@ func TestScenario(t *testing.T) {
 	}
 
 	log.Println("GetIntegrationEventsByCorrelationID")
-	correlationEvents, err := integrationEventsLog.GetIntegrationEventsByCorrelationID(debitAccountCommand.CorrelationID)
+	correlationEvents, err := repository.GetEventStreamRepository().GetIntegrationEventsByCorrelationID(debitAccountCommand.CorrelationID)
 	if err != nil || len(correlationEvents) == 0 {
 		t.Fatal(err)
 	}
