@@ -1,11 +1,12 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
 	"log"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 type SampleCommand struct {
@@ -25,7 +26,7 @@ func TestInMemoryCommandBus(t *testing.T) {
 	// and receiving Commands from the queue
 	receiveCommandChannel := make(chan cqrs.CommandTransactedAccept)
 	// Start receiving Commands by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{nil, closeChannel, errorChannel, receiveCommandChannel}); err != nil {
+	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{nil, closeChannel, errorChannel, receiveCommandChannel, false}); err != nil {
 		t.Fatal(err)
 	}
 

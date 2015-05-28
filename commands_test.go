@@ -1,9 +1,10 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
 	"log"
 	"testing"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 type SampleMessageCommand struct {

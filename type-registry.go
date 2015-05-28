@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// DebugTypeRegistry if set to true logs type resolution failures
+var DebugTypeRegistry = false
 var methodHandlerPrefix = "Handle"
 
 // HandlersCache is a map of types to functions that will be used to route event sourcing events
@@ -65,10 +67,12 @@ func (r *defaultTypeRegistry) GetTypeByName(typeName string) (reflect.Type, bool
 		return typeValue, ok
 	}
 
-	log.Println("Could not find type registration for type  - ", typeName)
-	log.Println("The registry looks as follows:")
-	for key := range r.Types {
-		log.Println(key)
+	if DebugTypeRegistry {
+		log.Println("Could not find type registration for type  - ", typeName)
+		log.Println("The registry looks as follows:")
+		for key := range r.Types {
+			log.Println(key)
+		}
 	}
 
 	return nil, false

@@ -52,6 +52,7 @@ type CommandReceiverOptions struct {
 	Close          chan chan error
 	Error          chan error
 	ReceiveCommand chan CommandTransactedAccept
+	Exclusive      bool
 }
 
 // CommandTransactedAccept is the message routed from a command receiver to the command manager.
@@ -136,7 +137,7 @@ func (m *CommandDispatchManager) RegisterGlobalHandler(handler CommandHandler) {
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests
-func (m *CommandDispatchManager) Listen(stop <-chan bool) error {
+func (m *CommandDispatchManager) Listen(stop <-chan bool, exclusive bool) error {
 	// Create communication channels
 	//
 	// for closing the queue listener,
@@ -147,7 +148,7 @@ func (m *CommandDispatchManager) Listen(stop <-chan bool) error {
 	receiveCommandChannel := make(chan CommandTransactedAccept)
 
 	// Start receiving commands by passing these channels to the worker thread (go routine)
-	options := CommandReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveCommandChannel}
+	options := CommandReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveCommandChannel, exclusive}
 	if err := m.receiver.ReceiveCommands(options); err != nil {
 		return err
 	}

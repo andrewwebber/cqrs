@@ -1,12 +1,13 @@
 package rabbit_test
 
 import (
-	"github.com/andrewwebber/cqrs"
-	"github.com/andrewwebber/cqrs/rabbit"
 	"log"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/andrewwebber/cqrs/rabbit"
 )
 
 type SampleCommand struct {
@@ -32,7 +33,7 @@ func TestCommandBus(t *testing.T) {
 	// and receiving commands from the queue
 	receiveCommandChannel := make(chan cqrs.CommandTransactedAccept)
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{commandTypeCache, closeChannel, errorChannel, receiveCommandChannel}); err != nil {
+	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{commandTypeCache, closeChannel, errorChannel, receiveCommandChannel, false}); err != nil {
 		t.Fatal(err)
 	}
 

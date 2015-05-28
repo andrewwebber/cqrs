@@ -85,7 +85,7 @@ func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 }
 
 func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) error {
-	conn, c, commands, err := bus.consumeCommandsQueue()
+	conn, c, commands, err := bus.consumeCommandsQueue(options.Exclusive)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 				} else {
 					// Could have been disconnected
 					log.Println("Stopped listening for messages")
-					conn, c, commands, err = bus.consumeCommandsQueue()
+					conn, c, commands, err = bus.consumeCommandsQueue(options.Exclusive)
 				}
 			}
 		}
@@ -144,7 +144,7 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 	return nil
 }
 
-func (bus *CommandBus) consumeCommandsQueue() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+func (bus *CommandBus) consumeCommandsQueue(exclusive bool) (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
 	if err != nil {
@@ -173,13 +173,13 @@ func (bus *CommandBus) consumeCommandsQueue() (*amqp.Connection, *amqp.Channel, 
 		return nil, nil, nil, fmt.Errorf("queue.bind: %v", err)
 	}
 
-	commands, err := c.Consume(bus.name, bus.name, false, true, false, false, nil)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
+	if err := c.Qos(3, 0, false); err != nil {
+		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
 	}
 
-	if err := c.Qos(1, 0, false); err != nil {
-		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
+	commands, err := c.Consume(bus.name, bus.name, false, exclusive, false, false, nil)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
 	}
 
 	return conn, c, commands, nil
