@@ -61,6 +61,7 @@ type VersionedEventReceiverOptions struct {
 	Close        chan chan error
 	Error        chan error
 	ReceiveEvent chan VersionedEventTransactedAccept
+	Exclusive    bool
 }
 
 // VersionedEventDispatcher is responsible for routing events from the event manager to call handlers responsible for processing received events
@@ -138,7 +139,7 @@ func (m *VersionedEventDispatchManager) RegisterGlobalHandler(handler VersionedE
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests
-func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
+func (m *VersionedEventDispatchManager) Listen(stop <-chan bool, exclusive bool) error {
 	// Create communication channels
 	//
 	// for closing the queue listener,
@@ -149,7 +150,7 @@ func (m *VersionedEventDispatchManager) Listen(stop <-chan bool) error {
 	receiveEventChannel := make(chan VersionedEventTransactedAccept)
 
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveEventChannel}
+	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveEventChannel, exclusive}
 	if err := m.receiver.ReceiveEvents(options); err != nil {
 		return err
 	}

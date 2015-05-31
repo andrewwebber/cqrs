@@ -86,7 +86,7 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 }
 
 func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) error {
-	conn, c, events, err := bus.consumeEventsQueue()
+	conn, c, events, err := bus.consumeEventsQueue(options.Exclusive)
 	if err != nil {
 		return err
 	}
@@ -128,14 +128,18 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 								log.Println("EventBus.Dispatching Message")
 								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
 								result := <-ackCh
-								message.Ack(result)
+								if result {
+									message.Ack(result)
+								} else {
+									message.Reject(true)
+								}
 							}
 						}
 					}
 				} else {
 					// Could have been disconnected
 					log.Println("Stopped listening for messages")
-					conn, c, events, err = bus.consumeEventsQueue()
+					conn, c, events, err = bus.consumeEventsQueue(options.Exclusive)
 				}
 			}
 		}
@@ -160,7 +164,7 @@ func (bus *EventBus) DeleteQueue(name string) error {
 	return err
 }
 
-func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
+func (bus *EventBus) consumeEventsQueue(exclusive bool) (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
 	if err != nil {
@@ -189,13 +193,13 @@ func (bus *EventBus) consumeEventsQueue() (*amqp.Connection, *amqp.Channel, <-ch
 		return nil, nil, nil, fmt.Errorf("queue.bind: %v", err)
 	}
 
-	events, err := c.Consume(bus.name, bus.name, false, true, false, false, nil)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
-	}
-
 	if err := c.Qos(1, 0, false); err != nil {
 		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
+	}
+
+	events, err := c.Consume(bus.name, bus.name, false, exclusive, false, false, nil)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
 	}
 
 	return conn, c, events, nil

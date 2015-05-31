@@ -39,7 +39,7 @@ func TestScenario(t *testing.T) {
 	commandDispatcherStopChannel := make(chan bool)
 	eventDispatcherStopChannel := make(chan bool)
 	go commandDispatcher.Listen(commandDispatcherStopChannel, false)
-	go eventDispatcher.Listen(eventDispatcherStopChannel)
+	go eventDispatcher.Listen(eventDispatcherStopChannel, false)
 
 	log.Println("Dump models")
 	log.Println(readModel)

@@ -20,6 +20,8 @@ The framework attempts to provides helpful functions to facilitate:
 
 [Example test scenario (couchbase, rabbitmq)](https://github.com/andrewwebber/cqrs/blob/master/example/example_test.go)
 
+[Example CQRS scaleout/concurrent test](https://github.com/andrewwebber/cqrs-scaleout)
+
 ## Test Scenario
 The example test scenario is of a simple bank account that seeks to track, using event sourcing, a
 customers balance and login password

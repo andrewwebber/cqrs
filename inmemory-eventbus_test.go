@@ -1,11 +1,12 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
 	"log"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 type SampleEvent struct {
@@ -25,7 +26,7 @@ func TestInMemoryEventBus(t *testing.T) {
 	// and receiving events from the queue
 	receiveEventChannel := make(chan cqrs.VersionedEventTransactedAccept)
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{nil, closeChannel, errorChannel, receiveEventChannel}); err != nil {
+	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{nil, closeChannel, errorChannel, receiveEventChannel, false}); err != nil {
 		t.Fatal(err)
 	}
 

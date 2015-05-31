@@ -1,12 +1,13 @@
 package rabbit_test
 
 import (
-	"github.com/andrewwebber/cqrs"
-	"github.com/andrewwebber/cqrs/rabbit"
 	"log"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/andrewwebber/cqrs"
+	"github.com/andrewwebber/cqrs/rabbit"
 )
 
 type SampleEvent struct {
@@ -32,7 +33,7 @@ func TestEventBus(t *testing.T) {
 	// and receiving events from the queue
 	receiveEventChannel := make(chan cqrs.VersionedEventTransactedAccept)
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{eventTypeCache, closeChannel, errorChannel, receiveEventChannel}); err != nil {
+	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{eventTypeCache, closeChannel, errorChannel, receiveEventChannel, false}); err != nil {
 		t.Fatal(err)
 	}
 
