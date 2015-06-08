@@ -1,10 +1,14 @@
 package cqrs
 
 import (
+	"errors"
 	"log"
 	"reflect"
 	"time"
 )
+
+// ErrConcurrencyWhenSavingEvents is raised when a concurrency error has occured when saving events
+var ErrConcurrencyWhenSavingEvents = errors.New("concurrency error saving event")
 
 // VersionedEvent represents an event in the past for an aggregate
 type VersionedEvent struct {

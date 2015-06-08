@@ -58,8 +58,13 @@ func (r *EventStreamRepository) Save(sourceID string, events []cqrs.VersionedEve
 	latestVersion := events[len(events)-1].Version
 	for _, versionedEvent := range events {
 		key := fmt.Sprintf("%s:%s:%d", r.cbPrefix, sourceID, versionedEvent.Version)
-		if added, err := r.bucket.Add(key, 0, versionedEvent); err != nil || !added {
+		added, err := r.bucket.Add(key, 0, versionedEvent)
+		if err != nil {
 			return err
+		}
+
+		if !added {
+			return cqrs.ErrConcurrencyWhenSavingEvents
 		}
 
 		if err := r.SaveIntegrationEvent(versionedEvent); err != nil {
@@ -102,6 +107,7 @@ func (r *EventStreamRepository) SaveIntegrationEvent(event cqrs.VersionedEvent) 
 	return nil
 }
 
+// GetIntegrationEventsByCorrelationID returns all integration events by correlation ID
 func (r *EventStreamRepository) GetIntegrationEventsByCorrelationID(correlationID string) ([]cqrs.VersionedEvent, error) {
 	var eventsByCorrelationID map[string]cbVersionedEvent
 	correlationKey := "eventstore:correlation:" + correlationID
@@ -212,13 +218,15 @@ func (r *EventStreamRepository) Get(id string) ([]cqrs.VersionedEvent, error) {
 	return events, nil
 }
 
-const NOT_FOUND string = "Not found"
+// NotFound error string returned from couchbase when a key cannot be found
+const NotFound string = "Not found"
 
+// IsNotFoundError checks if we get a key not found error from couchbase
 func IsNotFoundError(err error) bool {
 	// No error?
 	if err == nil {
 		return false
 	}
 
-	return strings.Contains(err.Error(), NOT_FOUND)
+	return strings.Contains(err.Error(), NotFound)
 }
