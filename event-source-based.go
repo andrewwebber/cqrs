@@ -1,8 +1,9 @@
 package cqrs
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"reflect"
+
+	"github.com/pborman/uuid"
 )
 
 // EventSourced providers an interface for event sourced aggregate types

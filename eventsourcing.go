@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 )
 
 // EventSourcingRepository is a repository for event source based aggregates

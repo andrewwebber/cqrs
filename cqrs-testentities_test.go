@@ -1,11 +1,12 @@
 package cqrs_test
 
 import (
-	"code.google.com/p/go.crypto/bcrypt"
 	"errors"
 	"fmt"
-	"github.com/andrewwebber/cqrs"
 	"log"
+
+	"github.com/andrewwebber/cqrs"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type ChangeEmailAddressCommand struct {

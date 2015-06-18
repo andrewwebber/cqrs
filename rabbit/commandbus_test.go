@@ -33,7 +33,7 @@ func TestCommandBus(t *testing.T) {
 	// and receiving commands from the queue
 	receiveCommandChannel := make(chan cqrs.CommandTransactedAccept)
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{commandTypeCache, closeChannel, errorChannel, receiveCommandChannel, false}); err != nil {
+	if err := bus.ReceiveCommands(cqrs.CommandReceiverOptions{TypeRegistry: commandTypeCache, Close: closeChannel, Error: errorChannel, ReceiveCommand: receiveCommandChannel, Exclusive: false}); err != nil {
 		t.Fatal(err)
 	}
 

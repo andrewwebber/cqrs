@@ -3,7 +3,7 @@ package cqrs
 import (
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 )
 
 const CQRSErrorEventType = "cqrs.CQRSErrorEvent"
