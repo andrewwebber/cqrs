@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/andrewwebber/cqrs"
+
 	"github.com/couchbaselabs/go-couchbase"
 )
 

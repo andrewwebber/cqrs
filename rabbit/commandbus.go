@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/andrewwebber/cqrs"
+
 	"github.com/streadway/amqp"
 )
 
@@ -21,16 +22,19 @@ type RawCommand struct {
 	Body          json.RawMessage
 }
 
+// CommandBus ...
 type CommandBus struct {
 	connectionString string
 	name             string
 	exchange         string
 }
 
+// NewCommandBus will create a new command bus
 func NewCommandBus(connectionString string, name string, exchange string) *CommandBus {
 	return &CommandBus{connectionString, name, exchange}
 }
 
+// PublishCommands will publish commands
 func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
@@ -84,6 +88,7 @@ func (bus *CommandBus) PublishCommands(commands []cqrs.Command) error {
 	return nil
 }
 
+// ReceiveCommands will recieve commands
 func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) error {
 	conn, c, commands, err := bus.consumeCommandsQueue(options.Exclusive)
 	if err != nil {
@@ -92,8 +97,10 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 
 	go func() {
 		for {
+			log.Println("looping")
 			select {
 			case ch := <-options.Close:
+				log.Println("Close requested")
 				defer conn.Close()
 				ch <- c.Cancel(bus.name, false)
 				return
@@ -122,7 +129,7 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 									Body:          reflect.Indirect(commandValue).Interface()}
 								ackCh := make(chan bool)
 								log.Println("CommandBus.Dispatching Message")
-								options.ReceiveCommand <- cqrs.CommandTransactedAccept{command, ackCh}
+								options.ReceiveCommand <- cqrs.CommandTransactedAccept{Command: command, ProcessedSuccessfully: ackCh}
 								result := <-ackCh
 								if result {
 									message.Ack(result)
@@ -133,9 +140,23 @@ func (bus *CommandBus) ReceiveCommands(options cqrs.CommandReceiverOptions) erro
 						}
 					}
 				} else {
-					// Could have been disconnected
-					log.Println("Stopped listening for messages")
-					conn, c, commands, err = bus.consumeCommandsQueue(options.Exclusive)
+					log.Println("RabbitMQ: Could have been disconnected")
+					for {
+						retryError := exponential(func() error {
+							connR, cR, commandsR, errR := bus.consumeCommandsQueue(options.Exclusive)
+							if errR == nil {
+								conn, c, commands, err = connR, cR, commandsR, errR
+							}
+
+							log.Println(err)
+
+							return errR
+						}, 5)
+
+						if retryError == nil {
+							break
+						}
+					}
 				}
 			}
 		}
@@ -173,13 +194,13 @@ func (bus *CommandBus) consumeCommandsQueue(exclusive bool) (*amqp.Connection, *
 		return nil, nil, nil, fmt.Errorf("queue.bind: %v", err)
 	}
 
-	if err := c.Qos(3, 0, false); err != nil {
-		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
-	}
-
 	commands, err := c.Consume(bus.name, bus.name, false, exclusive, false, false, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
+	}
+
+	if err := c.Qos(1, 0, false); err != nil {
+		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
 	}
 
 	return conn, c, commands, nil

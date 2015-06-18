@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/andrewwebber/cqrs"
+
 	"github.com/streadway/amqp"
 )
 
+// RawVersionedEvent ...
 type RawVersionedEvent struct {
 	ID            string    `json:"id"`
 	CorrelationID string    `json:"correlationID"`
@@ -22,16 +24,19 @@ type RawVersionedEvent struct {
 	Event         json.RawMessage
 }
 
+// EventBus  ...
 type EventBus struct {
 	connectionString string
 	name             string
 	exchange         string
 }
 
+// NewEventBus ...
 func NewEventBus(connectionString string, name string, exchange string) *EventBus {
 	return &EventBus{connectionString, name, exchange}
 }
 
+// PublishEvents will publish events
 func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
@@ -85,6 +90,7 @@ func (bus *EventBus) PublishEvents(events []cqrs.VersionedEvent) error {
 	return nil
 }
 
+// ReceiveEvents will receive events
 func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) error {
 	conn, c, events, err := bus.consumeEventsQueue(options.Exclusive)
 	if err != nil {
@@ -93,6 +99,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 
 	go func() {
 		for {
+			log.Printf("connection %v, channel %v, events %v\n", conn, c, events)
 			select {
 			case ch := <-options.Close:
 				defer conn.Close()
@@ -126,20 +133,30 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 									Event:         reflect.Indirect(eventValue).Interface()}
 								ackCh := make(chan bool)
 								log.Println("EventBus.Dispatching Message")
-								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{versionedEvent, ackCh}
+								options.ReceiveEvent <- cqrs.VersionedEventTransactedAccept{Event: versionedEvent, ProcessedSuccessfully: ackCh}
 								result := <-ackCh
-								if result {
-									message.Ack(result)
-								} else {
-									message.Reject(true)
-								}
+								message.Ack(result)
 							}
 						}
 					}
 				} else {
-					// Could have been disconnected
-					log.Println("Stopped listening for messages")
-					conn, c, events, err = bus.consumeEventsQueue(options.Exclusive)
+					log.Println("RabbitMQ: Could have been disconnected")
+					for {
+						retryError := exponential(func() error {
+							connR, cR, eventsR, errR := bus.consumeEventsQueue(options.Exclusive)
+							if errR == nil {
+								conn, c, events, err = connR, cR, eventsR, errR
+							}
+
+							log.Println(err)
+
+							return errR
+						}, 5)
+
+						if retryError == nil {
+							break
+						}
+					}
 				}
 			}
 		}
@@ -148,6 +165,7 @@ func (bus *EventBus) ReceiveEvents(options cqrs.VersionedEventReceiverOptions) e
 	return nil
 }
 
+// DeleteQueue will delete a queue
 func (bus *EventBus) DeleteQueue(name string) error {
 	// Connects opens an AMQP connection from the credentials in the URL.
 	conn, err := amqp.Dial(bus.connectionString)
@@ -193,13 +211,13 @@ func (bus *EventBus) consumeEventsQueue(exclusive bool) (*amqp.Connection, *amqp
 		return nil, nil, nil, fmt.Errorf("queue.bind: %v", err)
 	}
 
-	if err := c.Qos(1, 0, false); err != nil {
-		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
-	}
-
 	events, err := c.Consume(bus.name, bus.name, false, exclusive, false, false, nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("basic.consume: %v", err)
+	}
+
+	if err := c.Qos(1, 0, false); err != nil {
+		return nil, nil, nil, fmt.Errorf("Qos: %v", err)
 	}
 
 	return conn, c, events, nil
