@@ -26,7 +26,7 @@ The framework attempts to provides helpful functions to facilitate:
 The example test scenario is of a simple bank account that seeks to track, using event sourcing, a
 customers balance and login password
 
-The are two make areas of concern at the application level, the **Write model** and **Read model**.
+The are two main areas of concern at the application level, the **Write model** and **Read model**.
 The read model is aimed to facilitate fast reads (read model projections)
 The write model is where the business logic get executed and asynchronously notifies the read models
 
