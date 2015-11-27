@@ -1,11 +1,23 @@
 package postgres_test
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/postgres"
 )
+
+var (
+	PG_USER     string
+	PG_PASSWORD string
+)
+
+func init() {
+	PG_USER = os.Getenv("POSTGRES_USER")
+	PG_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
+}
 
 func TestPgEventStreamRepoSave(t *testing.T) {
 	typeRegistry := cqrs.NewTypeRegistry()
@@ -17,7 +29,7 @@ func TestPgEventStreamRepoSave(t *testing.T) {
 		PasswordChangedEvent{},
 	)
 	persistance, err := postgres.NewEventStreamRepository(
-		"user=postgres password=admin dbname=cqrs_postgres_test sslmode=disable",
+		fmt.Sprintf("host=localhost port=5432 user=%s password=%s dbname=cqrs_pg_test sslmode=disable", PG_USER, PG_PASSWORD),
 		typeRegistry,
 	)
 	if err != nil {
