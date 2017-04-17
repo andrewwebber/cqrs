@@ -5,7 +5,7 @@ CQRS framework in go
 [![GoDoc](https://godoc.org/github.com/andrewwebber/cqrs?status.svg)](https://godoc.org/github.com/andrewwebber/cqrs)
 [![Build Status](https://drone.io/github.com/andrewwebber/cqrs/status.png?foo=bar)](https://drone.io/github.com/andrewwebber/cqrs/latest)
 
-#Project Summary
+# Project Summary
 The package provides a framework for quickly implementing a CQRS style application.
 The framework attempts to provides helpful functions to facilitate:
 - Event Sourcing
