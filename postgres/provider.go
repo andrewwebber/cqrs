@@ -56,7 +56,7 @@ type PgVersionedEvent struct {
 	Version       int            `db:"version"`
 	EventType     string         `db:"eventtype"`
 	Created       time.Time      `db:"created"`
-	Event         types.JsonText `db:"event"`
+	Event         types.JSONText `db:"event"`
 }
 
 type EventStreamRepository struct {
@@ -216,7 +216,7 @@ func (esr *EventStreamRepository) toPgEvent(event cqrs.VersionedEvent) (*PgVersi
 		Version:       event.Version,
 		EventType:     event.EventType,
 		Created:       event.Created,
-		Event:         types.JsonText(b),
+		Event:         types.JSONText(b),
 	}, nil
 }
 
