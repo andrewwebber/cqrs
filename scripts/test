@@ -1,0 +1,20 @@
+#!/bin/bash -e
+
+PKGS=$(go list ./... | grep -v /vendor)
+
+CGO_ENABLED=1 go test -v -race $PKGS -cover
+
+LINTERS_FLAGS=$GOLANGCI_LINT_FLAGS
+
+echo "Checking $GOLANGCI_LINT_FLAGS_OVERRIDE"
+
+if [ -e "$GOLANGCI_LINT_FLAGS_OVERRIDE" ]; then
+	LINTERS_FLAGS=$(cat $GOLANGCI_LINT_FLAGS_OVERRIDE)
+fi
+
+echo "Linter flags = $LINTERS_FLAGS"
+
+if ! ./bin/golangci-lint run --enable-all $LINTERS_FLAGS; then
+	echo "ERROR -- Failed linters"
+	exit 2
+fi
