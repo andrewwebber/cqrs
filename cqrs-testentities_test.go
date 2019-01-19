@@ -3,9 +3,10 @@ package cqrs_test
 import (
 	"errors"
 	"fmt"
-	"log"
+	"reflect"
 
 	"github.com/andrewwebber/cqrs"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -72,6 +73,28 @@ type Account struct {
 	Balance      float64
 }
 
+func (account *Account) CopyFrom(source interface{}) {
+
+	account.FirstName = reflect.Indirect(reflect.ValueOf(source)).FieldByName("FirstName").Interface().(string)
+	account.LastName = reflect.Indirect(reflect.ValueOf(source)).FieldByName("LastName").Interface().(string)
+	account.EmailAddress = reflect.Indirect(reflect.ValueOf(source)).FieldByName("EmailAddress").Interface().(string)
+	account.PasswordHash = reflect.Indirect(reflect.ValueOf(source)).FieldByName("PasswordHash").Interface().([]byte)
+	account.Balance = reflect.Indirect(reflect.ValueOf(source)).FieldByName("Balance").Interface().(float64)
+
+	/*cqrs.PackageLogger().Debugf("valueOfSource", valueOfSource)
+	fieldValue := valueOfSource
+	cqrs.PackageLogger().Debugf("fieldValue", fieldValue)
+	fieldValueInterface := fieldValue
+	cqrs.PackageLogger().Debugf("fieldValueInterface", fieldValueInterface)
+	firstName := fieldValueInterface.(string)
+	cqrs.PackageLogger().Debugf("firstName", firstName)*/
+
+	/*account.LastName = reflect.Indirect(reflect.ValueOf(source).FieldByName("LastName")).Interface().(string)
+	account.EmailAddress = reflect.Indirect(reflect.ValueOf(source).FieldByName("EmailAddress")).Interface().(string)
+	account.PasswordHash = reflect.Indirect(reflect.ValueOf(source).FieldByName("PasswordHash")).Interface().([]byte)
+	account.Balance = reflect.Indirect(reflect.ValueOf(source).FieldByName("FirstName")).Interface().(float64)*/
+}
+
 func (account *Account) String() string {
 	return fmt.Sprintf("Account %s with Email Address %s has balance %f", account.ID(), account.EmailAddress, account.Balance)
 }
@@ -89,9 +112,19 @@ func NewAccountFromHistory(id string, repository cqrs.EventSourcingRepository) (
 	account := new(Account)
 	account.EventSourceBased = cqrs.NewEventSourceBasedWithID(account, id)
 
-	if error := repository.Get(id, account); error != nil {
-		return account, error
+	snapshot, err := repository.GetSnapshot(id)
+	if err == nil {
+		cqrs.PackageLogger().Debugf("Loaded snapshot: %+v", snapshot)
+		account.SetVersion(snapshot.Version())
+		account.CopyFrom(snapshot)
+		cqrs.PackageLogger().Debugf("Updated account: %+v ", account)
 	}
+
+	if err := repository.Get(id, account); err != nil {
+		return nil, err
+	}
+
+	cqrs.PackageLogger().Debugf("Loaded account: %+v", account)
 
 	return account, nil
 }
@@ -134,7 +167,7 @@ func (account *Account) ChangePassword(newPassword string) error {
 
 	hashedPassword, err := GetHashForPassword(newPassword)
 	if err != nil {
-		panic(err)
+		return (err)
 	}
 
 	account.Update(PasswordChangedEvent{hashedPassword})
@@ -147,7 +180,7 @@ func GetHashForPassword(password string) ([]byte, error) {
 	// Hashing the password with the cost of 10
 	hashedPassword, err := bcrypt.GenerateFromPassword(passwordBytes, 10)
 	if err != nil {
-		log.Println("Error getting password hash: ", err)
+		cqrs.PackageLogger().Debugf("Error getting password hash: ", err)
 		return nil, err
 	}
 

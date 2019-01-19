@@ -1,13 +1,11 @@
 package cqrs
 
 import (
-	"log"
+	"fmt"
 	"reflect"
 	"strings"
 )
 
-// DebugTypeRegistry if set to true logs type resolution failures
-var DebugTypeRegistry = false
 var methodHandlerPrefix = "Handle"
 
 // HandlersCache is a map of types to functions that will be used to route event sourcing events
@@ -51,37 +49,45 @@ func newTypeRegistry() *defaultTypeRegistry {
 func (r *defaultTypeRegistry) GetHandlers(source interface{}) HandlersCache {
 	sourceType := reflect.TypeOf(source)
 	var handlers HandlersCache
-	if value, ok := r.HandlersDirectory[sourceType]; ok {
-		handlers = value
-	} else {
-		handlers = createHandlersCache(source)
 
-		r.HandlersDirectory[sourceType] = handlers
-	}
+	handlerChan := make(chan bool)
+	quit := make(chan struct{})
 
+	defer close(quit)
+	go func(handlers *HandlersCache) {
+		select {
+		case handlerChan <- internalGetHandlers(r, sourceType, source, handlers):
+		//do nothing, this just blocks data race
+		case <-quit:
+			fmt.Println("quit")
+		}
+	}(&handlers)
+
+	//wait for channel to do it's stuff
+	<-handlerChan
 	return handlers
 }
 
+func internalGetHandlers(r *defaultTypeRegistry, sourceType reflect.Type, source interface{}, handlers *HandlersCache) bool {
+	if value, ok := r.HandlersDirectory[sourceType]; ok {
+		*handlers = value
+	} else {
+		*handlers = createHandlersCache(source)
+		r.HandlersDirectory[sourceType] = *handlers
+	}
+
+	return true
+}
+
 func (r *defaultTypeRegistry) GetTypeByName(typeName string) (reflect.Type, bool) {
-	if typeValue, ok := r.Types[typeName]; ok {
-		return typeValue, ok
-	}
-
-	if DebugTypeRegistry {
-		log.Println("Could not find type registration for type  - ", typeName)
-		log.Println("The registry looks as follows:")
-		for key := range r.Types {
-			log.Println(key)
-		}
-	}
-
-	return nil, false
+	typeValue, ok := r.Types[typeName]
+	return typeValue, ok
 }
 
 func (r *defaultTypeRegistry) RegisterType(source interface{}) {
 	rawType := reflect.TypeOf(source)
 	r.Types[rawType.String()] = rawType
-	log.Println("Type Registered - ", rawType.String())
+	PackageLogger().Debugf("Type Registered - %s", rawType.String())
 }
 
 func (r *defaultTypeRegistry) RegisterAggregate(aggregate interface{}, events ...interface{}) {

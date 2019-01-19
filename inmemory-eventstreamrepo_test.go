@@ -1,7 +1,7 @@
 package cqrs_test
 
 import (
-	"log"
+	"fmt"
 	"testing"
 
 	"github.com/andrewwebber/cqrs"
@@ -19,13 +19,17 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 		t.Fatal("Error: ", err)
 	}
 
-	log.Println("Get hash for user...")
+	cqrs.PackageLogger().Debugf("Get hash for user...")
 
-	log.Println("Create new account...")
+	cqrs.PackageLogger().Debugf("Create new account...")
 	account := NewAccount("John", "Snow", "john.snow@cqrs.example", hashedPassword, 0.0)
 	account.SetID(accountID)
-	account.ChangePassword("$ThisIsANOTHERPassword")
-	if err := repository.Save(account, "correlationID"); err != nil {
+	err = account.ChangePassword("$ThisIsANOTHERPassword")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = repository.Save(account, "correlationID")
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +45,7 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 	if events, err := persistance.AllIntegrationEventsEverPublished(); err != nil {
 		t.Fatal(err)
 	} else {
-		log.Println(events)
+		cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", events))
 	}
 
 	correlationEvents, err := persistance.GetIntegrationEventsByCorrelationID("correlationID")
@@ -53,8 +57,8 @@ func TestInMemoryEventStreamRepository(t *testing.T) {
 		t.Fatal("Expeced correlation events")
 	}
 
-	log.Println("GetIntegrationEventsByCorrelationID")
+	cqrs.PackageLogger().Debugf("GetIntegrationEventsByCorrelationID")
 	for _, correlationEvent := range correlationEvents {
-		log.Println(correlationEvent)
+		cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", correlationEvent))
 	}
 }

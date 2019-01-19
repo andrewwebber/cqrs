@@ -2,7 +2,6 @@ package cqrs
 
 import (
 	"errors"
-	"log"
 	"reflect"
 	"time"
 )
@@ -10,11 +9,16 @@ import (
 // ErrConcurrencyWhenSavingEvents is raised when a concurrency error has occured when saving events
 var ErrConcurrencyWhenSavingEvents = errors.New("concurrency error saving event")
 
+// ErrNonePendingWhenSavingEvents is raised when a save is issued but no events are pending for the eventsourced entity.
+var ErrNonePendingWhenSavingEvents = errors.New("no events pending error saving event")
+
 // VersionedEvent represents an event in the past for an aggregate
 type VersionedEvent struct {
 	ID            string    `json:"id"`
 	CorrelationID string    `json:"correlationID"`
 	SourceID      string    `json:"sourceID"`
+	Actor         string    `json:"actor"`
+	OnBehalfOf    string    `json:"onbehalfof"`
 	Version       int       `json:"version"`
 	EventType     string    `json:"eventType"`
 	Created       time.Time `json:"time"`
@@ -45,11 +49,22 @@ type VersionedEventReceiver interface {
 	ReceiveEvents(VersionedEventReceiverOptions) error
 }
 
+// EventBus ...
+type EventBus interface {
+	VersionedEventPublisher
+	VersionedEventReceiver
+}
+
 // VersionedEventDispatchManager is responsible for coordinating receiving messages from event receivers and dispatching them to the event dispatcher.
 type VersionedEventDispatchManager struct {
 	versionedEventDispatcher *MapBasedVersionedEventDispatcher
 	typeRegistry             TypeRegistry
 	receiver                 VersionedEventReceiver
+}
+
+// VersionedEventDispatcher the internal versioned event dispatcher
+func (m *VersionedEventDispatchManager) VersionedEventDispatcher() VersionedEventDispatcher {
+	return m.versionedEventDispatcher
 }
 
 // VersionedEventTransactedAccept is the message routed from an event receiver to the event manager.
@@ -61,11 +76,12 @@ type VersionedEventTransactedAccept struct {
 
 // VersionedEventReceiverOptions is an initalization structure to communicate to and from an event receiver go routine
 type VersionedEventReceiverOptions struct {
-	TypeRegistry TypeRegistry
-	Close        chan chan error
-	Error        chan error
-	ReceiveEvent chan VersionedEventTransactedAccept
-	Exclusive    bool
+	TypeRegistry  TypeRegistry
+	Close         chan chan error
+	Error         chan error
+	ReceiveEvent  VersionedEventHandler
+	Exclusive     bool
+	ListenerCount int
 }
 
 // VersionedEventDispatcher is responsible for routing events from the event manager to call handlers responsible for processing received events
@@ -112,6 +128,7 @@ func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) e
 	if handlers, ok := m.registry[eventType]; ok {
 		for _, handler := range handlers {
 			if err := handler(event); err != nil {
+				metricsEventsFailed.WithLabelValues(event.EventType).Inc()
 				return err
 			}
 		}
@@ -119,9 +136,12 @@ func (m *MapBasedVersionedEventDispatcher) DispatchEvent(event VersionedEvent) e
 
 	for _, handler := range m.globalHandlers {
 		if err := handler(event); err != nil {
+			metricsEventsFailed.WithLabelValues(event.EventType).Inc()
 			return err
 		}
 	}
+
+	metricsEventsDispatched.WithLabelValues(event.EventType).Inc()
 
 	return nil
 }
@@ -143,45 +163,48 @@ func (m *VersionedEventDispatchManager) RegisterGlobalHandler(handler VersionedE
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests
-func (m *VersionedEventDispatchManager) Listen(stop <-chan bool, exclusive bool) error {
+func (m *VersionedEventDispatchManager) Listen(stop <-chan bool, exclusive bool, listenerCount int) error {
 	// Create communication channels
 	//
 	// for closing the queue listener,
 	closeChannel := make(chan chan error)
 	// receiving errors from the listener thread (go routine)
 	errorChannel := make(chan error)
-	// and receiving events from the queue
-	receiveEventChannel := make(chan VersionedEventTransactedAccept)
+
+	// Version event received channel receives a result with a channel to respond to, signifying successful processing of the message.
+	// This should eventually call an event handler. See cqrs.NewVersionedEventDispatcher()
+	versionedEventHandler := func(event VersionedEvent) error {
+		err := m.versionedEventDispatcher.DispatchEvent(event)
+		if err != nil {
+			PackageLogger().Debugf("Error dispatching event: %v", err)
+		}
+
+		return err
+	}
 
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveEventChannel, exclusive}
+	options := VersionedEventReceiverOptions{m.typeRegistry, closeChannel, errorChannel, versionedEventHandler, exclusive, listenerCount}
 	if err := m.receiver.ReceiveEvents(options); err != nil {
 		return err
 	}
 
-	for {
-		// Wait on multiple channels using the select control flow.
-		select {
-		// Version event received channel receives a result with a channel to respond to, signifying successful processing of the message.
-		// This should eventually call an event handler. See cqrs.NewVersionedEventDispatcher()
-		case event := <-receiveEventChannel:
-			log.Println("EventDispatchManager.DispatchEvent: ", event.Event)
-			if err := m.versionedEventDispatcher.DispatchEvent(event.Event); err != nil {
-				log.Println("Error dispatching event: ", err)
+	go func() {
+		for {
+			// Wait on multiple channels using the select control flow.
+			select {
+			//PackageLogger().Debugf(nil, "EventDispatchManager.DispatchSuccessful")
+			case <-stop:
+				PackageLogger().Debugf("EventDispatchManager.Stopping")
+				closeSignal := make(chan error)
+				closeChannel <- closeSignal
+				PackageLogger().Debugf("EventDispatchManager.Stopped")
+				<-closeSignal
+			// Receiving on this channel signifys an error has occured worker processor side
+			case err := <-errorChannel:
+				PackageLogger().Debugf("EventDispatchManager.ErrorReceived: %v", err)
 			}
-
-			event.ProcessedSuccessfully <- true
-			log.Println("EventDispatchManager.DispatchSuccessful")
-		case <-stop:
-			log.Println("EventDispatchManager.Stopping")
-			closeSignal := make(chan error)
-			closeChannel <- closeSignal
-			defer log.Println("EventDispatchManager.Stopped")
-			return <-closeSignal
-		// Receiving on this channel signifys an error has occured worker processor side
-		case err := <-errorChannel:
-			log.Println("EventDispatchManager.ErrorReceived: ", err)
-			return err
 		}
-	}
+	}()
+
+	return nil
 }

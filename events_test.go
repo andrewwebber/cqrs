@@ -1,9 +1,9 @@
 package cqrs_test
 
 import (
-	"github.com/andrewwebber/cqrs"
-	"log"
 	"testing"
+
+	"github.com/andrewwebber/cqrs"
 )
 
 type SampleMessageReceivedEvent struct {
@@ -14,12 +14,15 @@ func TestDefaultVersionedEventDispatcher(t *testing.T) {
 	dispatcher := cqrs.NewVersionedEventDispatcher()
 	success := false
 	dispatcher.RegisterEventHandler(SampleMessageReceivedEvent{}, func(event cqrs.VersionedEvent) error {
-		log.Println("Received Message : ", event.Event.(SampleMessageReceivedEvent).Message)
+		cqrs.PackageLogger().Debugf("Received Message : ", event.Event.(SampleMessageReceivedEvent).Message)
 		success = true
 		return nil
 	})
 
-	dispatcher.DispatchEvent(cqrs.VersionedEvent{Event: SampleMessageReceivedEvent{"Hello world"}})
+	err := dispatcher.DispatchEvent(cqrs.VersionedEvent{Event: SampleMessageReceivedEvent{"Hello world"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !success {
 		t.Fatal("Expected success")
 	}

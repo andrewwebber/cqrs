@@ -1,7 +1,7 @@
 package cqrs_test
 
 import (
-	"log"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -25,15 +25,25 @@ func TestInMemoryEventBus(t *testing.T) {
 	errorChannel := make(chan error)
 	// and receiving events from the queue
 	receiveEventChannel := make(chan cqrs.VersionedEventTransactedAccept)
+	eventHandler := func(event cqrs.VersionedEvent) error {
+		accepted := make(chan bool)
+		receiveEventChannel <- cqrs.VersionedEventTransactedAccept{Event: event, ProcessedSuccessfully: accepted}
+		if <-accepted {
+			return nil
+		}
+
+		return errors.New("Unsuccessful")
+	}
+
 	// Start receiving events by passing these channels to the worker thread (go routine)
-	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{nil, closeChannel, errorChannel, receiveEventChannel, false}); err != nil {
+	if err := bus.ReceiveEvents(cqrs.VersionedEventReceiverOptions{TypeRegistry: nil, Close: closeChannel, Error: errorChannel, ReceiveEvent: eventHandler}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Publish a simple event
-	log.Println("Publishing events")
+	cqrs.PackageLogger().Debugf("Publishing events")
 	go func() {
-		if err := bus.PublishEvents([]cqrs.VersionedEvent{cqrs.VersionedEvent{
+		if err := bus.PublishEvents([]cqrs.VersionedEvent{{
 			EventType: eventType.String(),
 			Event:     SampleEvent{"TestInMemoryEventBus"}}}); err != nil {
 			t.Fatal(err)
@@ -56,7 +66,7 @@ func TestInMemoryEventBus(t *testing.T) {
 		// This should eventually call an event handler. See cqrs.NewVersionedEventDispatcher()
 	case event := <-receiveEventChannel:
 		sampleEvent := event.Event.Event.(SampleEvent)
-		log.Println(sampleEvent.Message)
+		cqrs.PackageLogger().Debugf(sampleEvent.Message)
 		event.ProcessedSuccessfully <- true
 		// Receiving on this channel signifys an error has occured work processor side
 	case err := <-errorChannel:

@@ -1,11 +1,8 @@
 package cqrs
 
 import (
-	"log"
 	"reflect"
 	"time"
-
-	"github.com/pborman/uuid"
 )
 
 // Command represents an actor intention to alter the state of the system
@@ -20,23 +17,38 @@ type Command struct {
 // CreateCommand is a helper for creating a new command object with populated default properties
 func CreateCommand(body interface{}) Command {
 	commandType := reflect.TypeOf(body)
-	return Command{uuid.New(), uuid.New(), commandType.String(), time.Now(), body}
+	return Command{MessageID: "mid:" + NewUUIDString(),
+		CorrelationID: "cid:" + NewUUIDString(),
+		CommandType:   commandType.String(),
+		Created:       time.Now(),
+
+		Body: body}
 }
 
 // CreateCommandWithCorrelationID is a helper for creating a new command object with populated default properties
 func CreateCommandWithCorrelationID(body interface{}, correlationID string) Command {
 	commandType := reflect.TypeOf(body)
-	return Command{uuid.New(), correlationID, commandType.String(), time.Now(), body}
+	return Command{MessageID: "mid:" + NewUUIDString(),
+		CorrelationID: correlationID,
+		CommandType:   commandType.String(),
+		Created:       time.Now(),
+		Body:          body}
 }
 
 // CommandPublisher is responsilbe for publishing commands
 type CommandPublisher interface {
-	Publish(Command) error
+	PublishCommands([]Command) error
 }
 
 // CommandReceiver is responsible for receiving commands
 type CommandReceiver interface {
 	ReceiveCommands(CommandReceiverOptions) error
+}
+
+// CommandBus ...
+type CommandBus interface {
+	CommandReceiver
+	CommandPublisher
 }
 
 // CommandDispatchManager is responsible for coordinating receiving messages from command receivers and dispatching them to the command dispatcher.
@@ -46,13 +58,19 @@ type CommandDispatchManager struct {
 	receiver          CommandReceiver
 }
 
+// CommandDispatcher the internal command dispatcher
+func (m *CommandDispatchManager) CommandDispatcher() CommandDispatcher {
+	return m.commandDispatcher
+}
+
 // CommandReceiverOptions is an initalization structure to communicate to and from a command receiver go routine
 type CommandReceiverOptions struct {
 	TypeRegistry   TypeRegistry
 	Close          chan chan error
 	Error          chan error
-	ReceiveCommand chan CommandTransactedAccept
+	ReceiveCommand CommandHandler
 	Exclusive      bool
+	ListenerCount  int
 }
 
 // CommandTransactedAccept is the message routed from a command receiver to the command manager.
@@ -106,6 +124,7 @@ func (m *MapBasedCommandDispatcher) DispatchCommand(command Command) error {
 	if handlers, ok := m.registry[bodyType]; ok {
 		for _, handler := range handlers {
 			if err := handler(command); err != nil {
+				metricsCommandsFailed.WithLabelValues(command.CommandType).Inc()
 				return err
 			}
 		}
@@ -113,9 +132,12 @@ func (m *MapBasedCommandDispatcher) DispatchCommand(command Command) error {
 
 	for _, handler := range m.globalHandlers {
 		if err := handler(command); err != nil {
+			metricsCommandsFailed.WithLabelValues(command.CommandType).Inc()
 			return err
 		}
 	}
+
+	metricsCommandsDispatched.WithLabelValues(command.CommandType).Inc()
 
 	return nil
 }
@@ -137,46 +159,48 @@ func (m *CommandDispatchManager) RegisterGlobalHandler(handler CommandHandler) {
 }
 
 // Listen starts a listen loop processing channels related to new incoming events, errors and stop listening requests
-func (m *CommandDispatchManager) Listen(stop <-chan bool, exclusive bool) error {
+func (m *CommandDispatchManager) Listen(stop <-chan bool, exclusive bool, listenerCount int) error {
 	// Create communication channels
 	//
 	// for closing the queue listener,
 	closeChannel := make(chan chan error)
 	// receiving errors from the listener thread (go routine)
 	errorChannel := make(chan error)
-	// and receiving commands from the queue
-	receiveCommandChannel := make(chan CommandTransactedAccept)
 
-	// Start receiving commands by passing these channels to the worker thread (go routine)
-	options := CommandReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveCommandChannel, exclusive}
-	if err := m.receiver.ReceiveCommands(options); err != nil {
+	// Command received channel receives a result with a channel to respond to, signifying successful processing of the message.
+	// This should eventually call a command handler. See cqrs.NewVersionedCommandDispatcher()
+	receiveCommandHandler := func(command Command) error {
+		PackageLogger().Debugf("CommandDispatchManager.DispatchCommand: %v", command.CorrelationID)
+		err := m.commandDispatcher.DispatchCommand(command)
+		if err != nil {
+			PackageLogger().Debugf("Error dispatching command: %v", err)
+		}
+
 		return err
 	}
 
-	for {
-		// Wait on multiple channels using the select control flow.
-		select {
-		// Command received channel receives a result with a channel to respond to, signifying successful processing of the message.
-		// This should eventually call a command handler. See cqrs.NewVersionedCommandDispatcher()
-		case command := <-receiveCommandChannel:
-			log.Println("CommandDispatchManager.DispatchCommand: ", command.Command)
-			if err := m.commandDispatcher.DispatchCommand(command.Command); err != nil {
-				log.Println("Error dispatching command: ", err)
-				command.ProcessedSuccessfully <- false
-			} else {
-				command.ProcessedSuccessfully <- true
-				log.Println("CommandDispatchManager.DispatchSuccessful")
-			}
-		case <-stop:
-			log.Println("CommandDispatchManager.Stopping")
-			closeSignal := make(chan error)
-			closeChannel <- closeSignal
-			defer log.Println("CommandDispatchManager.Stopped")
-			return <-closeSignal
-		// Receiving on this channel signifys an error has occured worker processor side
-		case err := <-errorChannel:
-			log.Println("CommandDispatchManager.ErrorReceived: ", err)
-			return err
-		}
+	// Start receiving commands by passing these channels to the worker thread (go routine)
+	options := CommandReceiverOptions{m.typeRegistry, closeChannel, errorChannel, receiveCommandHandler, exclusive, listenerCount}
+	if err := m.receiver.ReceiveCommands(options); err != nil {
+		return err
 	}
+	go func() {
+		for {
+			// Wait on multiple channels using the select control flow.
+			select {
+			case <-stop:
+				PackageLogger().Debugf("CommandDispatchManager.Stopping")
+				closeSignal := make(chan error)
+				closeChannel <- closeSignal
+				PackageLogger().Debugf("CommandDispatchManager.Stopped")
+				<-closeSignal
+			// Receiving on this channel signifys an error has occured worker processor side
+			case err := <-errorChannel:
+				PackageLogger().Debugf("CommandDispatchManager.ErrorReceived: %s", err)
+
+			}
+		}
+	}()
+
+	return nil
 }

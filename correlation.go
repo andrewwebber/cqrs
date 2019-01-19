@@ -2,24 +2,29 @@ package cqrs
 
 import (
 	"time"
-
-	"github.com/pborman/uuid"
 )
 
-const CQRSErrorEventType = "cqrs.CQRSErrorEvent"
+// CQRSErrorEventType ...
+const CQRSErrorEventType = "cqrs.ErrorEvent"
 
-// CQRSErrorEvent is a generic event raised within the CQRS framework
-type CQRSErrorEvent struct {
+// ErrorEvent is a generic event raised within the CQRS framework
+type ErrorEvent struct {
 	Message string
 }
 
+// DeliverCQRSError will deliver a CQRS error
 func DeliverCQRSError(correlationID string, err error, repo EventSourcingRepository) {
-	repo.GetEventStreamRepository().SaveIntegrationEvent(VersionedEvent{
-		ID:            uuid.New(),
+	err = repo.GetEventStreamRepository().SaveIntegrationEvent(VersionedEvent{
+		ID:            "ve:" + NewUUIDString(),
 		CorrelationID: correlationID,
 		SourceID:      "",
 		Version:       0,
 		EventType:     CQRSErrorEventType,
 		Created:       time.Now(),
-		Event:         CQRSErrorEvent{Message: err.Error()}})
+
+		Event: ErrorEvent{Message: err.Error()}})
+
+	if err != nil {
+		PackageLogger().Debugf("ERROR saving integration event: %v\n", err)
+	}
 }

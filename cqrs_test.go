@@ -1,18 +1,22 @@
 package cqrs_test
 
 import (
+	"fmt"
 	"log"
 	"testing"
 	"time"
 
 	"github.com/andrewwebber/cqrs"
-	"github.com/logrusorgru/glr"
+
+	"github.com/stretchr/testify/require"
 )
 
-var accountID = "5058e029-d329-4c4b-b111-b042e48b0c5f"
+var accountID = cqrs.NewUUIDString()
 
 func TestScenario(t *testing.T) {
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	// Type Registry
 	typeRegistry := cqrs.NewTypeRegistry()
 
@@ -20,7 +24,8 @@ func TestScenario(t *testing.T) {
 	persistance := cqrs.NewInMemoryEventStreamRepository()
 	bus := cqrs.NewInMemoryEventBus()
 	repository := cqrs.NewRepositoryWithPublisher(persistance, bus, typeRegistry)
-	typeRegistry.RegisterAggregate(&Account{}, AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
+	typeRegistry.RegisterAggregate(&Account{})
+	typeRegistry.RegisterEvents(AccountCreatedEvent{}, EmailAddressChangedEvent{}, AccountCreditedEvent{}, AccountDebitedEvent{}, PasswordChangedEvent{})
 
 	// Read Models
 	readModel := NewReadModelAccounts()
@@ -38,57 +43,66 @@ func TestScenario(t *testing.T) {
 
 	commandDispatcherStopChannel := make(chan bool)
 	eventDispatcherStopChannel := make(chan bool)
-	go commandDispatcher.Listen(commandDispatcherStopChannel, false)
-	go eventDispatcher.Listen(eventDispatcherStopChannel, false)
+	go func() {
+		err := commandDispatcher.Listen(commandDispatcherStopChannel, false, 1)
+		require.NoError(t, err)
+	}()
+	go func() {
+		err := eventDispatcher.Listen(eventDispatcherStopChannel, false, 1)
+		require.NoError(t, err)
+	}()
 
-	log.Println("Dump models")
-	log.Println(readModel)
-	log.Println(usersModel)
+	cqrs.PackageLogger().Debugf("Dump models")
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModel))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", usersModel))
 
-	log.Println("Find an account")
-	readModelAccount := readModel.Accounts[accountID]
-	log.Println(readModelAccount)
+	cqrs.PackageLogger().Debugf("Find an account")
+	readModelAccount := readModel.GetAccount(accountID)
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModelAccount))
 
-	log.Println("Find a user")
+	cqrs.PackageLogger().Debugf("Find a user")
 	user := usersModel.Users[accountID]
-	log.Println(user)
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", user))
 
 	hashedPassword, err := GetHashForPassword("$ThisIsMyPassword1")
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}
 
-	log.Println("Create new account...")
+	cqrs.PackageLogger().Debugf("Create new account...")
 	createAccountCommand := cqrs.CreateCommand(
 		CreateAccountCommand{"John", "Snow", "John.Snow@thewall.eu", hashedPassword, 0.0})
-	commandBus.PublishCommands([]cqrs.Command{createAccountCommand})
+	err = commandBus.PublishCommands([]cqrs.Command{createAccountCommand})
+	require.NoError(t, err)
 
-	log.Println("Dump models")
-	log.Println(readModel)
-	log.Println(usersModel)
+	cqrs.PackageLogger().Debugf("Dump models")
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModel))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", usersModel))
 
-	log.Println("Change Password")
+	cqrs.PackageLogger().Debugf("Change Password")
 	changePasswordCommand := cqrs.CreateCommand(
 		ChangePasswordCommand{accountID, "$ThisIsANOTHERPassword"})
-	commandBus.PublishCommands([]cqrs.Command{changePasswordCommand})
+	err = commandBus.PublishCommands([]cqrs.Command{changePasswordCommand})
+	require.NoError(t, err)
 
-	log.Println("Change email address and credit the account")
+	cqrs.PackageLogger().Debugf("Change email address and credit the account")
 	changeEmailAddressCommand := cqrs.CreateCommand(
 		ChangeEmailAddressCommand{accountID, "john.snow@the.wall"})
 	creditAccountCommand := cqrs.CreateCommand(
 		CreditAccountCommand{accountID, 50})
 	creditAccountCommand2 := cqrs.CreateCommand(
 		CreditAccountCommand{accountID, 50})
-	commandBus.PublishCommands([]cqrs.Command{
+	err = commandBus.PublishCommands([]cqrs.Command{
 		changeEmailAddressCommand,
 		creditAccountCommand,
 		creditAccountCommand2})
+	require.NoError(t, err)
 
-	log.Println("Dump models")
-	log.Println(readModel)
-	log.Println(usersModel)
+	cqrs.PackageLogger().Debugf("Dump models")
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModel))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", usersModel))
 
-	log.Println("Change the email address, credit 150, debit 200")
+	cqrs.PackageLogger().Debugf("Change the email address, credit 150, debit 200")
 	lastEmailAddress := "john.snow@golang.org"
 	changeEmailAddressCommand = cqrs.CreateCommand(
 		ChangeEmailAddressCommand{accountID, lastEmailAddress})
@@ -96,52 +110,53 @@ func TestScenario(t *testing.T) {
 		CreditAccountCommand{accountID, 150})
 	debitAccountCommand := cqrs.CreateCommand(
 		DebitAccountCommand{accountID, 200})
-	commandBus.PublishCommands([]cqrs.Command{
+	err = commandBus.PublishCommands([]cqrs.Command{
 		changeEmailAddressCommand,
 		creditAccountCommand,
 		debitAccountCommand})
+	require.NoError(t, err)
 
-	log.Println("Dump models")
-	log.Println(readModel)
-	log.Println(usersModel)
+	cqrs.PackageLogger().Debugf("Dump models")
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModel))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", usersModel))
 
 	time.Sleep(300 * time.Millisecond)
-	log.Println("Dump history - integration events")
+	cqrs.PackageLogger().Debugf("Dump history - integration events")
 	if history, err := repository.GetEventStreamRepository().AllIntegrationEventsEverPublished(); err != nil {
 		t.Fatal(err)
 	} else {
 		for _, event := range history {
-			log.Println(event)
+			cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", event))
 		}
 	}
 
-	log.Println("GetIntegrationEventsByCorrelationID")
+	cqrs.PackageLogger().Debugf("GetIntegrationEventsByCorrelationID")
 	correlationEvents, err := repository.GetEventStreamRepository().GetIntegrationEventsByCorrelationID(debitAccountCommand.CorrelationID)
 	if err != nil || len(correlationEvents) == 0 {
 		t.Fatal(err)
 	}
 
-	for correlationEvent := range correlationEvents {
-		log.Println(correlationEvent)
+	for _, correlationEvent := range correlationEvents {
+		cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", correlationEvent))
 	}
 
-	log.Println("Load the account from history")
+	cqrs.PackageLogger().Debugf("Load the account from history")
 	account, error := NewAccountFromHistory(accountID, repository)
 	if error != nil {
 		t.Fatal(error)
 	}
 
 	// All events should have been replayed and the email address should be the latest
-	log.Println("Dump models")
-	log.Println(account)
-	log.Println(readModel)
-	log.Println(usersModel)
+	cqrs.PackageLogger().Debugf("Dump models")
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", account))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", readModel))
+	cqrs.PackageLogger().Debugf(fmt.Sprintf("%+v", usersModel))
 
 	if account.EmailAddress != lastEmailAddress {
 		t.Fatal("Expected emailaddress to be ", lastEmailAddress)
 	}
 
-	if account.Balance != readModel.Accounts[accountID].Balance {
+	if account.Balance != readModel.GetAccount(accountID).Balance {
 		t.Fatal("Expected readmodel to be synced with write model")
 	}
 
@@ -151,9 +166,15 @@ func TestScenario(t *testing.T) {
 
 func RegisterIntegrationEventHandlers(eventDispatcher *cqrs.VersionedEventDispatchManager, integrationEventsLog cqrs.VersionedEventPublicationLogger, readModel *ReadModelAccounts, usersModel *UsersModel) {
 	eventDispatcher.RegisterGlobalHandler(func(event cqrs.VersionedEvent) error {
-		integrationEventsLog.SaveIntegrationEvent(event)
-		readModel.UpdateViewModel([]cqrs.VersionedEvent{event})
-		usersModel.UpdateViewModel([]cqrs.VersionedEvent{event})
+		if err := integrationEventsLog.SaveIntegrationEvent(event); err != nil {
+			return err
+		}
+		if err := readModel.UpdateViewModel([]cqrs.VersionedEvent{event}); err != nil {
+			return err
+		}
+		if err := usersModel.UpdateViewModel([]cqrs.VersionedEvent{event}); err != nil {
+			return err
+		}
 		return nil
 	})
 }
@@ -161,70 +182,91 @@ func RegisterIntegrationEventHandlers(eventDispatcher *cqrs.VersionedEventDispat
 func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, repository cqrs.EventSourcingRepository) {
 	commandDispatcher.RegisterCommandHandler(CreateAccountCommand{}, func(command cqrs.Command) error {
 		createAccountCommand := command.Body.(CreateAccountCommand)
-		log.Println(glr.Green("Processing command - Create account"))
+		cqrs.PackageLogger().Debugf("Processing command - Create account")
 		account := NewAccount(createAccountCommand.FirstName,
 			createAccountCommand.LastName,
 			createAccountCommand.EmailAddress,
 			createAccountCommand.PasswordHash,
 			createAccountCommand.InitialBalance)
 
-		log.Println(glr.Green("Set ID..."))
+		cqrs.PackageLogger().Debugf("Set ID...")
 		account.SetID(accountID)
-		log.Println(account)
-		log.Println(glr.Green("Persist the account"))
-		repository.Save(account, command.CorrelationID)
-		log.Println(glr.Green(account.String()))
+		cqrs.PackageLogger().Debugf("Persist the account")
+		cqrs.PackageLogger().Debugf("Account %+v", account)
+
+		if _, err := repository.Save(account, command.CorrelationID); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf(account.String())
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(ChangeEmailAddressCommand{}, func(command cqrs.Command) error {
 		changeEmailAddressCommand := command.Body.(ChangeEmailAddressCommand)
-		log.Println(glr.Green("Processing command - Change email address"))
+		cqrs.PackageLogger().Debugf("Processing command - Change email address")
 		account, err := NewAccountFromHistory(changeEmailAddressCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
-		account.ChangeEmailAddress(changeEmailAddressCommand.NewEmailAddress)
-		log.Println(glr.Green("Persist the account"))
-		repository.Save(account, command.CorrelationID)
-		log.Println(glr.Green(account.String()))
+		if err := account.ChangeEmailAddress(changeEmailAddressCommand.NewEmailAddress); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf("Account %+v", account)
+
+		cqrs.PackageLogger().Debugf("Persist the account")
+		if _, err := repository.Save(account, command.CorrelationID); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf(account.String())
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(ChangePasswordCommand{}, func(command cqrs.Command) error {
 		changePasswordCommand := command.Body.(ChangePasswordCommand)
-		log.Println(glr.Green("Processing command - Change password"))
+		cqrs.PackageLogger().Debugf("Processing command - Change password")
 		account, err := NewAccountFromHistory(changePasswordCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
-		account.ChangePassword(changePasswordCommand.NewPassword)
-		log.Println(glr.Green("Persist the account"))
-		repository.Save(account, command.CorrelationID)
-		log.Println(glr.Green(account.String()))
+		cqrs.PackageLogger().Debugf("Account %+v", account)
+
+		if err := account.ChangePassword(changePasswordCommand.NewPassword); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf("Persist the account")
+		if _, err := repository.Save(account, command.CorrelationID); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf(account.String())
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(CreditAccountCommand{}, func(command cqrs.Command) error {
 		creditAccountCommand := command.Body.(CreditAccountCommand)
-		log.Println(glr.Green("Processing command - Credit account"))
+		cqrs.PackageLogger().Debugf("Processing command - Credit account")
 		account, err := NewAccountFromHistory(creditAccountCommand.AccountID, repository)
 		if err != nil {
 			return err
 		}
 
-		account.Credit(creditAccountCommand.Amount)
-		log.Println(glr.Green("Persist the account"))
-		repository.Save(account, command.CorrelationID)
-		log.Println(glr.Green(account.String()))
+		if err := account.Credit(creditAccountCommand.Amount); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf("Account %+v", account)
+
+		cqrs.PackageLogger().Debugf("Persist the account")
+		if _, err := repository.Save(account, command.CorrelationID); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf(account.String())
 		return nil
 	})
 
 	commandDispatcher.RegisterCommandHandler(DebitAccountCommand{}, func(command cqrs.Command) error {
 		debitAccountCommand := command.Body.(DebitAccountCommand)
-		log.Println(glr.Green("Processing command - Debit account"))
+		cqrs.PackageLogger().Debugf("Processing command - Debit account")
 		account, err := NewAccountFromHistory(debitAccountCommand.AccountID, repository)
 		if err != nil {
 			return err
@@ -234,9 +276,13 @@ func RegisterCommandHandlers(commandDispatcher *cqrs.CommandDispatchManager, rep
 			return err
 		}
 
-		log.Println(glr.Green("Persist the account"))
-		repository.Save(account, command.CorrelationID)
-		log.Println(glr.Green(account.String()))
+		cqrs.PackageLogger().Debugf("Account %+v", account)
+
+		cqrs.PackageLogger().Debugf("Persist the account")
+		if _, err := repository.Save(account, command.CorrelationID); err != nil {
+			return err
+		}
+		cqrs.PackageLogger().Debugf(account.String())
 		return nil
 	})
 }

@@ -1,8 +1,8 @@
 // Package cqrs provides a CQRS and Event Sourcing framework written in go influenced by the cqrs journey guide
 //
-// For a full guide visit http://github.com/andrewwebber/cqrs
+// For a full guide visit http://gitlab.brainloop.com/pkg/cqrs
 //
-//  import "github.com/andrewwebber/cqrs"
+//  import "gitlab.brainloop.com/pkg/cqrs"
 //
 //  func NewAccount(firstName string, lastName string, emailAddress string, passwordHash []byte, initialBalance float64) *Account {
 //    account := new(Account)

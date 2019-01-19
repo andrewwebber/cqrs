@@ -2,8 +2,6 @@ package cqrs
 
 import (
 	"reflect"
-
-	"github.com/pborman/uuid"
 )
 
 // EventSourced providers an interface for event sourced aggregate types
@@ -14,6 +12,9 @@ type EventSourced interface {
 	SetVersion(int)
 	Events() []interface{}
 	CallEventHandler(event interface{})
+	SetSource(interface{})
+	WantsToSaveSnapshot() bool
+	SuggestSaveSnapshot()
 }
 
 // EventSourceBased provider a base class for aggregate times wishing to contain basis helper functionality for event sourcing
@@ -23,16 +24,17 @@ type EventSourceBased struct {
 	events        []interface{}
 	source        interface{}
 	handlersCache HandlersCache
+	saveSnapshot  bool
 }
 
 // NewEventSourceBased constructor
 func NewEventSourceBased(source interface{}) EventSourceBased {
-	return NewEventSourceBasedWithID(source, uuid.New())
+	return NewEventSourceBasedWithID(source, NewUUIDString())
 }
 
 // NewEventSourceBasedWithID constructor
 func NewEventSourceBasedWithID(source interface{}, id string) EventSourceBased {
-	return EventSourceBased{id, 0, []interface{}{}, source, createHandlersCache(source)}
+	return EventSourceBased{id, 0, []interface{}{}, source, createHandlersCache(source), false}
 }
 
 // Update should be called to change the state of an aggregate type
@@ -67,6 +69,11 @@ func (s *EventSourceBased) Version() int {
 	return s.version
 }
 
+// SetSource ...
+func (s *EventSourceBased) SetSource(source interface{}) {
+	s.source = source
+}
+
 // SetVersion sets the aggregate's Version
 func (s *EventSourceBased) SetVersion(version int) {
 	s.version = version
@@ -75,4 +82,14 @@ func (s *EventSourceBased) SetVersion(version int) {
 // Events returns a slice of newly created events since last deserialization
 func (s *EventSourceBased) Events() []interface{} {
 	return s.events
+}
+
+// WantsToSaveSnapshot returns whether the aggregate suggests to persist a snapshot upon the next save.
+func (s *EventSourceBased) WantsToSaveSnapshot() bool {
+	return s.saveSnapshot
+}
+
+// SuggestSaveSnapshot records that the aggregate suggests a save of the snapshot upon the next save.
+func (s *EventSourceBased) SuggestSaveSnapshot() {
+	s.saveSnapshot = true
 }
