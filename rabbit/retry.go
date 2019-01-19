@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// ConnectionStringResolver is a function that dynamically returns a connection string
+type ConnectionStringResolver func() (string, error)
+
 type function func() error
 
 func exponential(operation function, maxRetries int) error {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/andrewwebber/cqrs"
 
-	"github.com/couchbaselabs/go-couchbase"
+	couchbase "github.com/couchbaselabs/go-couchbase"
 )
 
 type cbVersionedEvent struct {
@@ -156,7 +156,7 @@ func (r *EventStreamRepository) AllIntegrationEventsEverPublished() ([]cqrs.Vers
 	var result []cqrs.VersionedEvent
 	for i := 0; i < counter; i++ {
 		key := fmt.Sprintf("integration::%d", i)
-		events, err := r.Get(key)
+		events, err := r.Get(key, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -171,8 +171,16 @@ func (r *EventStreamRepository) AllIntegrationEventsEverPublished() ([]cqrs.Vers
 	return result, nil
 }
 
+func (r *EventStreamRepository) GetSnapshot(id string) (cqrs.EventSourced, error) {
+	return nil, nil
+}
+
+func (r *EventStreamRepository) SaveSnapshot(eventsourced cqrs.EventSourced) error {
+	return nil
+}
+
 // Get retrieves events assoicated with an event sourced object by ID
-func (r *EventStreamRepository) Get(id string) ([]cqrs.VersionedEvent, error) {
+func (r *EventStreamRepository) Get(id string, fromVersion int) ([]cqrs.VersionedEvent, error) {
 	var version int
 	cbKey := fmt.Sprintf("%s:%s", r.cbPrefix, id)
 	if error := r.bucket.Get(cbKey, &version); error != nil {
