@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"code.google.com/p/go-uuid/uuid"
-	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/andrewwebber/cqrs"
 	"github.com/andrewwebber/cqrs/couchbase"
 	"github.com/andrewwebber/cqrs/rabbit"
-	"github.com/logrusorgru/glr"
+	"golang.org/x/crypto/bcrypt"
+
 	// "github.com/andrewwebber/cqrs/rethinkdb"
 	// r "github.com/dancannon/gorethink"
 	"log"
@@ -245,7 +244,7 @@ func RunScenario(t *testing.T, persistance cqrs.EventStreamRepository) {
 	stopChannel := make(chan bool)
 	go eventDispatcher.Listen(stopChannel)
 
-	testCorrelationID := uuid.New()
+	testCorrelationID := cqrs.NewUUIDString()
 	readModel.LoadAccounts(persistance)
 
 	usersModel.LoadUsers(persistance)
